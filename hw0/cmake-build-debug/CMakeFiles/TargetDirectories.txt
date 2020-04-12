@@ -1,0 +1,3 @@
+/home/student/Desktop/OS_HW/hw0/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/student/Desktop/OS_HW/hw0/cmake-build-debug/CMakeFiles/hw0.dir
+/home/student/Desktop/OS_HW/hw0/cmake-build-debug/CMakeFiles/edit_cache.dir

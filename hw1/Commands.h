@@ -3,19 +3,28 @@
 
 #include <vector>
 
+
+using namespace std;
+
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
 class Command {
 // TODO: Add your data members
+private:
+    string cmd;
+    bool takes_cpu;
  public:
-  Command(const char* cmd_line);
-  virtual ~Command();
+  Command(const char* cmd_line, bool takesCPU);
+  virtual ~Command() = default;
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
+
+  const char* getCommand() const;
+  bool takesCPU() const;
 };
 
 class BuiltInCommand : public Command {
@@ -100,24 +109,59 @@ class HistoryCommand : public BuiltInCommand {
 };
 
 class JobsList {
- public:
-  class JobEntry {
-   // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  JobsList();
-  ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+public:
+    class JobEntry {
+    private:
+        // TODO: Add your data members
+        int jobID;
+        const pid_t jobPID;
+        const string cmd;
+        const time_t start;
+        bool isStopped;
+        // TODO: Add your data members
+    public:
+        JobEntry(int jobID, pid_t pid, const string& cmd, bool isStopped);
+//        JobEntry(const JobEntry&) = default;
+//        JobEntry&operator=(const JobEntry&)= default;
+        ~JobEntry() = default;
+
+        int getJobID() const;
+        pid_t getJobPID() const;
+        string getJobCmd() const;
+        time_t getJobStartTime() const;
+        bool isJobStopped() const;
+
+        void setJobID(int id);
+        void stopJob();
+        void resumeJob();
+        /// need to add a printing function/operator
+    };
+
+private:
+    vector<JobEntry*> jobs;
+    int numOfJobs;
+    JobEntry* lastJob;
+    JobEntry* lastJobStopped;
+
+public:
+    JobsList();
+    ~JobsList();
+    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
+    void printJobsList();
+    void killAllJobs();
+    void removeFinishedJobs();
+    JobEntry * getJobById(int jobId);
+    void removeJobById(int jobId);
+    JobEntry * getLastJob(int* lastJobId);
+    JobEntry *getLastStoppedJob(int *jobId);
+// TODO: Add extra methods or modify exisitng ones as needed
+
+    const int getNumOfJobs() const;
+
+    void updateLastJobStopped();
+    void updateNumOfJobs();
 };
+ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
@@ -166,6 +210,7 @@ class CopyCommand : public BuiltInCommand {
 class SmallShell {
  private:
   // TODO: Add your data members
+  string prompt;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -179,6 +224,8 @@ class SmallShell {
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
+  void setPrompt(string newPrompt) {prompt = newPrompt;}
+  string getPrompt() const { return prompt;}
   // TODO: add extra methods as needed
 };
 

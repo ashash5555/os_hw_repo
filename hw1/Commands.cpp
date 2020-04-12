@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <time.h>
 
 using namespace std;
 
@@ -82,7 +83,120 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
+
+
+
+                                                 ///Command///
+///==================================================================================================================///
+Command::Command(const char* cmd_line, bool takes_cpu) : cmd(cmd_line), takes_cpu(takes_cpu) {}
+const char* Command::getCommand() const { return cmd.c_str();}
+bool Command::takesCPU() const { return takes_cpu;}
+///==================================================================================================================///
+
+
+                                                ///JobsList///
+///==================================================================================================================///
+JobsList::JobEntry::JobEntry(int jobID, pid_t pid, const string& cmd, bool isStopped) : jobID(jobID), jobPID(pid),
+                                                          cmd(cmd), start(time(nullptr)), isStopped(isStopped) {}
+int JobsList::JobEntry::getJobID() const { return jobID;}
+pid_t JobsList::JobEntry::getJobPID() const { return jobPID;}
+string JobsList::JobEntry::getJobCmd() const { return cmd;}
+time_t JobsList::JobEntry::getJobStartTime() const { return start;}
+bool JobsList::JobEntry::isJobStopped() const { return isStopped;}
+void JobsList::JobEntry::setJobID(int id) {jobID = id;}
+void JobsList::JobEntry::stopJob() {isStopped = true;}
+void JobsList::JobEntry::resumeJob() {isStopped = false;}
+
+/// Prints the job entry as one line: '[<job-id>] <command> : <process-id> <seconds-elapsed> secs (stopped)'
+/// \param os - ostream object (file descriptor)
+/// \param jobEntry - jobEntry to print
+/// \return os
+ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry) {
+    pid_t pid = jobEntry.getJobPID();
+    string cmd = jobEntry.getJobCmd();
+    int jobID = jobEntry.getJobID();
+    bool isStopped = jobEntry.isJobStopped();
+    time_t start = jobEntry.getJobStartTime();
+    time_t current = time(nullptr);
+    int timeElapsed = difftime(current, start) + 0.5;
+
+    os << "[" << jobID << "] " << cmd << " : " << pid << " " << timeElapsed << " secs";
+
+    if (isStopped) {
+        os << " (" << "stopped" << ")";
+    }
+
+    os << endl;
+    return os;
+}
+
+
+
+JobsList::JobsList() : jobs(vector<JobsList::JobEntry*>()), numOfJobs(0), lastJob(nullptr), lastJobStopped(nullptr) {}
+JobsList::~JobsList() {
+    if (lastJob) {
+        delete lastJob;
+        lastJob = nullptr;
+    }
+    if (lastJobStopped) {
+        delete lastJobStopped;
+        lastJobStopped = nullptr;
+    }
+
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            delete *it;
+            *it = nullptr;
+        }
+    }
+}
+
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
+    this->numOfJobs++;
+    int jobID = numOfJobs;
+    const char* cmdStr = cmd->getCommand();
+
+    JobEntry* jobToAdd = new JobEntry(jobID, pid, cmdStr, isStopped);
+    jobs.push_back(jobToAdd);
+}
+
+void JobsList::printJobsList() {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            cout << *it;
+        }
+    }
+}
+
+void JobsList::killAllJobs() {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            pid_t pid = (*it)->getJobPID();
+            kill(pid, SIGKILL);    /// check return status?
+            this->numOfJobs--;
+        }
+    }
+}
+///==================================================================================================================///
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 SmallShell::SmallShell() {
 // TODO: add your implementation
