@@ -233,20 +233,8 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
 ///==================================================================================================================///
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                                                ///SmallShell///
+///==================================================================================================================///
 SmallShell::SmallShell() {
 // TODO: add your implementation
 }
@@ -255,29 +243,78 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
-/**
-* Creates and returns a pointer to Command class which matches the given command line (cmd_line)
-*/
+/// Creates and returns a pointer to Command class which matches the given command line (cmd_line).
+/// \param cmd_line - the command line to return its' relevant Command class.
+/// \return A pointer to the Command object for the given command line or nullptr if no matching class was found.
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-	// For example:
-/*
-  string cmd_s = string(cmd_line);
-  if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-  */
-  return nullptr;
+    string cmdStr = string(cmd_line);
+    cmdStr = _trim(cmdStr);
+
+    /// params to send to constructors
+    bool takes_cpu = !_isBackgroundComamnd(cmd_line);
+    char** args = new char*[COMMAND_MAX_ARGS];
+    int numOfArgs = _parseCommandLine(cmd_line, args);
+
+    /// remove the background sign if needed
+    char* cmdChar = new char[cmdStr.length() + 1];
+    strcpy(cmdChar, cmdStr.c_str());
+    if (!takes_cpu) {
+        /// if we got here, the command needs to run in the background
+        _removeBackgroundSign(cmdChar);
+        cmdStr = string(cmdChar);
+    }
+
+    Command* command = nullptr;
+
+    /// check what command was sent and returns the relevant command object
+    /// string.find("some string") return the index of the first occurrence of the given string, so we check the
+    /// first word.
+    ///TODO: we need to send the relevant parameters to each constructor. This is just a skeleton.
+//    size_t res = cmdStr.find("chprompt");
+//    if (res == 0) {
+//        command = new ChpromptCommand(cmd_line);
+//    }
+//    res = cmdStr.find("pwd");
+//    if (res == 0) {
+//        command = new GetCurrDirCommand(cmd_line);
+//    }
+//    res = cmdStr.find("cd");
+//    if (res == 0) {
+//        command = new ChangeDirCommand(cmd_line);
+//    }
+//    res = cmdStr.find("jobs");
+//    if (res == 0) {
+//        command = new JobsCommand(cmd_line);
+//    }
+//    res = cmdStr.find("kill");
+//    if (res == 0) {
+//        command = new KillCommand(cmd_line);
+//    }
+//    res = cmdStr.find("fg");
+//    if (res == 0) {
+//        command = new ForegroundCommand(cmd_line);
+//    }
+//    res = cmdStr.find("bg");
+//    if (res == 0) {
+//        command = new BackgroundCommand(cmd_line);
+//    }
+//    res = cmdStr.find("quit");
+//    if (res == 0) {
+//        command = new QuitCommand(cmd_line);
+//    }
+//    else {
+//        command = new ExternalCommand(cmd_line);
+//    }
+
+    /// should not get here
+    return command;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+    // TODO: Add your implementation here
+    // for example:
+    // Command* cmd = CreateCommand(cmd_line);
+    // cmd->execute();
+    // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
+///==================================================================================================================///

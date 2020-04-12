@@ -6,23 +6,27 @@
 
 #IncludeRegexTransform: 
 
-/home/student/Desktop/OS_HW/hw1/Commands.h
-vector
+/home/student/Desktop/OS_HW/hw1/Commands.cpp
+unistd.h
 -
-
-/home/student/Desktop/OS_HW/hw1/signals.h
-
-/home/student/Desktop/OS_HW/hw1/smash.cpp
+string.h
+-
 iostream
 -
-unistd.h
+vector
+-
+sstream
 -
 sys/wait.h
 -
-signal.h
+iomanip
 -
 Commands.h
 /home/student/Desktop/OS_HW/hw1/Commands.h
-signals.h
-/home/student/Desktop/OS_HW/hw1/signals.h
+time.h
+-
+
+/home/student/Desktop/OS_HW/hw1/Commands.h
+vector
+-
 
