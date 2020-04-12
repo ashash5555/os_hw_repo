@@ -216,7 +216,7 @@ class SmallShell {
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
+  static SmallShell& getInstance() // make SmallShell singleton, will only return that one instance
   {
     static SmallShell instance; // Guaranteed to be destroyed.
     // Instantiated on first use.
