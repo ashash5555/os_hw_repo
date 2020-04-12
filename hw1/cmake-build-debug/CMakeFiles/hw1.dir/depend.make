@@ -4,11 +4,11 @@
 CMakeFiles/hw1.dir/Commands.cpp.o: ../Commands.cpp
 CMakeFiles/hw1.dir/Commands.cpp.o: ../Commands.h
 
-CMakeFiles/hw1.dir/main.cpp.o: ../Commands.h
-CMakeFiles/hw1.dir/main.cpp.o: ../main.cpp
-CMakeFiles/hw1.dir/main.cpp.o: ../signals.h
-
 CMakeFiles/hw1.dir/signals.cpp.o: ../Commands.h
 CMakeFiles/hw1.dir/signals.cpp.o: ../signals.cpp
 CMakeFiles/hw1.dir/signals.cpp.o: ../signals.h
+
+CMakeFiles/hw1.dir/smash.cpp.o: ../Commands.h
+CMakeFiles/hw1.dir/smash.cpp.o: ../signals.h
+CMakeFiles/hw1.dir/smash.cpp.o: ../smash.cpp
 

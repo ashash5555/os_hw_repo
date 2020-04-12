@@ -6,31 +6,13 @@
 
 #IncludeRegexTransform: 
 
-/home/student/Desktop/OS_HW/hw1/Commands.cpp
-unistd.h
--
-string.h
--
-iostream
--
-vector
--
-sstream
--
-sys/wait.h
--
-iomanip
--
-Commands.h
-/home/student/Desktop/OS_HW/hw1/Commands.h
-time.h
--
-
 /home/student/Desktop/OS_HW/hw1/Commands.h
 vector
 -
 
-/home/student/Desktop/OS_HW/hw1/main.cpp
+/home/student/Desktop/OS_HW/hw1/signals.h
+
+/home/student/Desktop/OS_HW/hw1/smash.cpp
 iostream
 -
 unistd.h
@@ -42,17 +24,5 @@ signal.h
 Commands.h
 /home/student/Desktop/OS_HW/hw1/Commands.h
 signals.h
-/home/student/Desktop/OS_HW/hw1/signals.h
-
-/home/student/Desktop/OS_HW/hw1/signals.cpp
-iostream
--
-signal.h
--
-signals.h
-/home/student/Desktop/OS_HW/hw1/signals.h
-Commands.h
-/home/student/Desktop/OS_HW/hw1/Commands.h
-
 /home/student/Desktop/OS_HW/hw1/signals.h
 

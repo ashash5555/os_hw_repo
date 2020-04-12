@@ -4,11 +4,11 @@
 CMakeFiles/hw1.dir/Commands.cpp.o
  /home/student/Desktop/OS_HW/hw1/Commands.cpp
  /home/student/Desktop/OS_HW/hw1/Commands.h
-CMakeFiles/hw1.dir/main.cpp.o
- /home/student/Desktop/OS_HW/hw1/Commands.h
- /home/student/Desktop/OS_HW/hw1/main.cpp
- /home/student/Desktop/OS_HW/hw1/signals.h
 CMakeFiles/hw1.dir/signals.cpp.o
  /home/student/Desktop/OS_HW/hw1/Commands.h
  /home/student/Desktop/OS_HW/hw1/signals.cpp
  /home/student/Desktop/OS_HW/hw1/signals.h
+CMakeFiles/hw1.dir/smash.cpp.o
+ /home/student/Desktop/OS_HW/hw1/Commands.h
+ /home/student/Desktop/OS_HW/hw1/signals.h
+ /home/student/Desktop/OS_HW/hw1/smash.cpp
