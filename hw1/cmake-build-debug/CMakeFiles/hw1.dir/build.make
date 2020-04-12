@@ -57,18 +57,18 @@ include CMakeFiles/hw1.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/hw1.dir/flags.make
 
-CMakeFiles/hw1.dir/smash.cpp.o: CMakeFiles/hw1.dir/flags.make
-CMakeFiles/hw1.dir/smash.cpp.o: ../smash.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/student/Desktop/OS_HW/hw1/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/hw1.dir/smash.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/hw1.dir/smash.cpp.o -c /home/student/Desktop/OS_HW/hw1/smash.cpp
+CMakeFiles/hw1.dir/main.cpp.o: CMakeFiles/hw1.dir/flags.make
+CMakeFiles/hw1.dir/main.cpp.o: ../main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/student/Desktop/OS_HW/hw1/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/hw1.dir/main.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/hw1.dir/main.cpp.o -c /home/student/Desktop/OS_HW/hw1/main.cpp
 
-CMakeFiles/hw1.dir/smash.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/hw1.dir/smash.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/student/Desktop/OS_HW/hw1/smash.cpp > CMakeFiles/hw1.dir/smash.cpp.i
+CMakeFiles/hw1.dir/main.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/hw1.dir/main.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/student/Desktop/OS_HW/hw1/main.cpp > CMakeFiles/hw1.dir/main.cpp.i
 
-CMakeFiles/hw1.dir/smash.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/hw1.dir/smash.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/student/Desktop/OS_HW/hw1/smash.cpp -o CMakeFiles/hw1.dir/smash.cpp.s
+CMakeFiles/hw1.dir/main.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/hw1.dir/main.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/student/Desktop/OS_HW/hw1/main.cpp -o CMakeFiles/hw1.dir/main.cpp.s
 
 CMakeFiles/hw1.dir/signals.cpp.o: CMakeFiles/hw1.dir/flags.make
 CMakeFiles/hw1.dir/signals.cpp.o: ../signals.cpp
@@ -98,14 +98,14 @@ CMakeFiles/hw1.dir/Commands.cpp.s: cmake_force
 
 # Object files for target hw1
 hw1_OBJECTS = \
-"CMakeFiles/hw1.dir/smash.cpp.o" \
+"CMakeFiles/hw1.dir/main.cpp.o" \
 "CMakeFiles/hw1.dir/signals.cpp.o" \
 "CMakeFiles/hw1.dir/Commands.cpp.o"
 
 # External object files for target hw1
 hw1_EXTERNAL_OBJECTS =
 
-hw1: CMakeFiles/hw1.dir/smash.cpp.o
+hw1: CMakeFiles/hw1.dir/main.cpp.o
 hw1: CMakeFiles/hw1.dir/signals.cpp.o
 hw1: CMakeFiles/hw1.dir/Commands.cpp.o
 hw1: CMakeFiles/hw1.dir/build.make

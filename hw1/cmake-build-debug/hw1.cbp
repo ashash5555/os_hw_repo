@@ -90,13 +90,13 @@
 		<Unit filename="/home/student/Desktop/OS_HW/hw1/Commands.h">
 			<Option target="hw1"/>
 		</Unit>
+		<Unit filename="/home/student/Desktop/OS_HW/hw1/main.cpp">
+			<Option target="hw1"/>
+		</Unit>
 		<Unit filename="/home/student/Desktop/OS_HW/hw1/signals.cpp">
 			<Option target="hw1"/>
 		</Unit>
 		<Unit filename="/home/student/Desktop/OS_HW/hw1/signals.h">
-			<Option target="hw1"/>
-		</Unit>
-		<Unit filename="/home/student/Desktop/OS_HW/hw1/smash.cpp">
 			<Option target="hw1"/>
 		</Unit>
 		<Unit filename="/home/student/Desktop/OS_HW/hw1/CMakeLists.txt">

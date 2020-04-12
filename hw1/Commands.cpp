@@ -139,16 +139,17 @@ JobsList::~JobsList() {
         delete lastJob;
         lastJob = nullptr;
     }
-    if (lastJobStopped) {
-        delete lastJobStopped;
-        lastJobStopped = nullptr;
-    }
 
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    vector<JobsList::JobEntry*>::iterator tempIt = it;
     for (; it != jobs.end(); ++it) {
         if (*it) {
             delete *it;
             *it = nullptr;
+            /// because iterator is undefined after erase
+            tempIt = it;
+            jobs.erase(it);
+            it = tempIt;
         }
     }
 }
@@ -173,13 +174,61 @@ void JobsList::printJobsList() {
 
 void JobsList::killAllJobs() {
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    vector<JobsList::JobEntry*>::iterator tempIt = it;
     for (; it != jobs.end(); ++it) {
         if (*it) {
             pid_t pid = (*it)->getJobPID();
             kill(pid, SIGKILL);    /// check return status?
+
+            delete *it;
+            *it = nullptr;
+            /// because iterator is undefined after erase
+            tempIt = it;
+            jobs.erase(it);
+            it = tempIt;
+
             this->numOfJobs--;
         }
     }
+}
+
+void JobsList::removeFinishedJobs() {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    vector<JobsList::JobEntry*>::iterator tempIt = it;
+    int res;
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            pid_t pid = (*it)->getJobPID();
+            /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running
+            res = waitpid(pid, nullptr, WNOHANG);
+            if (res > 0) {
+                /// gets here if this process finished
+                delete *it;
+                *it = nullptr;
+                /// because iterator is undefined after erase
+                tempIt = it;
+                jobs.erase(it);
+                it = tempIt;
+
+                this->numOfJobs--;
+            }
+        }
+    }
+}
+
+JobsList::JobEntry* JobsList::getJobById(int jobId) {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    int itJobID;
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            itJobID = (*it)->getJobID();
+            if (itJobID == jobId) {
+                return *it;
+            }
+        }
+    }
+    /// gets here if there is no job with the given id
+    return nullptr;
 }
 ///==================================================================================================================///
 
