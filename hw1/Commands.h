@@ -29,7 +29,7 @@ private:
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  BuiltInCommand(const char* cmd_line, bool takesCPU);
   virtual ~BuiltInCommand() {}
 };
 
@@ -139,9 +139,7 @@ public:
 
 private:
     vector<JobEntry*> jobs;
-    int numOfJobs;
-    JobEntry* lastJob;
-    JobEntry* lastJobStopped;
+    int jobsCount;
 
 public:
     JobsList();
@@ -156,10 +154,8 @@ public:
     JobEntry *getLastStoppedJob(int *jobId);
 // TODO: Add extra methods or modify exisitng ones as needed
 
-    const int getNumOfJobs() const;
-
-    void updateLastJobStopped();
-    void updateNumOfJobs();
+    const int getJobsCount() const;
+    void updateJobsCount();
 };
 ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
@@ -207,6 +203,19 @@ class CopyCommand : public BuiltInCommand {
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
 
+class ChpromptCommand : public BuiltInCommand {
+private:
+    string new_prompt;
+
+public:
+    ChpromptCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
+    ChpromptCommand(const ChpromptCommand&) = default;
+    ChpromptCommand&operator=(const ChpromptCommand&) = default;
+    ~ChpromptCommand() = default;
+
+    void execute() override;
+};
+
 class SmallShell {
  private:
   // TODO: Add your data members
@@ -224,8 +233,8 @@ class SmallShell {
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
-  void setPrompt(string newPrompt) {prompt = newPrompt;}
-  string getPrompt() const { return prompt;}
+  void setPrompt(string newPrompt);
+  string getPrompt() const;
   // TODO: add extra methods as needed
 };
 

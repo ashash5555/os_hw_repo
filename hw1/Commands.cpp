@@ -95,6 +95,12 @@ bool Command::takesCPU() const { return takes_cpu;}
 ///==================================================================================================================///
 
 
+                                                ///BuiltInCommand///
+///==================================================================================================================///
+BuiltInCommand::BuiltInCommand(const char *cmd_line, bool takesCPU) : Command(cmd_line, takesCPU){}
+///==================================================================================================================///
+
+
                                                 ///JobsList///
 ///==================================================================================================================///
 JobsList::JobEntry::JobEntry(int jobID, pid_t pid, const string& cmd, bool isStopped) : jobID(jobID), jobPID(pid),
@@ -133,13 +139,8 @@ ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry) {
 
 
 
-JobsList::JobsList() : jobs(vector<JobsList::JobEntry*>()), numOfJobs(0), lastJob(nullptr), lastJobStopped(nullptr) {}
+JobsList::JobsList() : jobs(vector<JobsList::JobEntry*>()), jobsCount(0) {}
 JobsList::~JobsList() {
-    if (lastJob) {
-        delete lastJob;
-        lastJob = nullptr;
-    }
-
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
     vector<JobsList::JobEntry*>::iterator tempIt = it;
     for (; it != jobs.end(); ++it) {
@@ -155,8 +156,9 @@ JobsList::~JobsList() {
 }
 
 void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
-    this->numOfJobs++;
-    int jobID = numOfJobs;
+    this->removeFinishedJobs();
+    this->jobsCount++;
+    int jobID = jobsCount;
     const char* cmdStr = cmd->getCommand();
 
     JobEntry* jobToAdd = new JobEntry(jobID, pid, cmdStr, isStopped);
@@ -164,6 +166,7 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 }
 
 void JobsList::printJobsList() {
+    this->removeFinishedJobs();
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
     for (; it != jobs.end(); ++it) {
         if (*it) {
@@ -186,10 +189,9 @@ void JobsList::killAllJobs() {
             tempIt = it;
             jobs.erase(it);
             it = tempIt;
-
-            this->numOfJobs--;
         }
     }
+    updateJobsCount();
 }
 
 void JobsList::removeFinishedJobs() {
@@ -209,11 +211,10 @@ void JobsList::removeFinishedJobs() {
                 tempIt = it;
                 jobs.erase(it);
                 it = tempIt;
-
-                this->numOfJobs--;
             }
         }
     }
+    updateJobsCount();
 }
 
 JobsList::JobEntry* JobsList::getJobById(int jobId) {
@@ -230,12 +231,131 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
     /// gets here if there is no job with the given id
     return nullptr;
 }
+
+///kill or waitpid?
+void JobsList::removeJobById(int jobId) {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    int res;
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            pid_t pid = (*it)->getJobPID();
+            int itJobID = (*it)->getJobID();
+            if (itJobID == jobId) {
+                /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running
+                res = waitpid(pid, nullptr, WNOHANG);
+                if (res > 0) {
+                    /// gets here if this process finished
+                    delete *it;
+                    *it = nullptr;
+                    jobs.erase(it);
+                }
+                break;
+            }
+        }
+    }
+    updateJobsCount();
+}
+
+JobsList::JobEntry* JobsList::getLastJob(int *lastJobId) {
+    this->removeFinishedJobs();
+    size_t size = jobs.size();
+    if (size == 0) {
+        *lastJobId = -1;
+        return nullptr;}
+    JobsList::JobEntry* lastJob = jobs.back();
+    if (!lastJob && lastJobId) *lastJobId = -1;
+    else if (lastJob && lastJobId){
+        *lastJobId = lastJob->getJobID();
+    }
+    return lastJob;
+}
+
+JobsList::JobEntry* JobsList::getLastStoppedJob(int *JobId) {
+    JobsList::JobEntry* lastStopped = nullptr;
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    bool isStopped;
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            isStopped = (*it)->isJobStopped();
+            if (isStopped) {
+                if (JobId) *JobId = (*it)->getJobID();
+                lastStopped = *it;
+            }
+        }
+    }
+    if (!lastStopped && JobId) *JobId = -1;
+    return lastStopped;
+}
+
+void JobsList::updateJobsCount() {
+    size_t size = jobs.size();
+    if (size == 0) {
+        jobsCount = 0;
+    } else {
+        JobsList::JobEntry* last = jobs.back();
+        jobsCount = last->getJobID();
+    }
+}
+
+const int JobsList::getJobsCount() const { return jobsCount;}
 ///==================================================================================================================///
+
+
+                                            ///ChpromptCommand///
+///==================================================================================================================///
+ChpromptCommand::ChpromptCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                            BuiltInCommand(cmd.c_str(), takes_cpu), new_prompt("") {
+    SmallShell& smash = SmallShell::getInstance();
+
+    /// args = [arg1='chprompt', arg2, arg3, ..., argn, NULL]
+    if (numOfArgs == 1) new_prompt = "smash> ";
+    else if (numOfArgs > 2) {
+        new_prompt = smash.getPrompt();
+    }
+    /// we assume numOfArgs == 2
+    else {
+        string arrow = "> ";
+        new_prompt = args[1] + arrow;
+    }
+}
+
+void ChpromptCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    smash.setPrompt(this->new_prompt);
+}
+///==================================================================================================================///
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
                                                 ///SmallShell///
 ///==================================================================================================================///
-SmallShell::SmallShell() {
+SmallShell::SmallShell() : prompt("smash> "){
 // TODO: add your implementation
 }
 
@@ -270,10 +390,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     /// string.find("some string") return the index of the first occurrence of the given string, so we check the
     /// first word.
     ///TODO: we need to send the relevant parameters to each constructor. This is just a skeleton.
-//    size_t res = cmdStr.find("chprompt");
-//    if (res == 0) {
-//        command = new ChpromptCommand(cmd_line);
-//    }
+    size_t res = cmdStr.find("chprompt");
+    if (res == 0) {
+        command = new ChpromptCommand(cmd_line, args, numOfArgs, takes_cpu);
+    }
 //    res = cmdStr.find("pwd");
 //    if (res == 0) {
 //        command = new GetCurrDirCommand(cmd_line);
@@ -311,10 +431,15 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
+    Command* cmd = CreateCommand(cmd_line);
+    cmd->execute();
     // TODO: Add your implementation here
     // for example:
     // Command* cmd = CreateCommand(cmd_line);
     // cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
+
+string SmallShell::getPrompt() const { return prompt;}
+void SmallShell::setPrompt(string newPrompt) {prompt = newPrompt;}
 ///==================================================================================================================///
