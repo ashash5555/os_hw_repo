@@ -25,6 +25,8 @@ Commands.h
 /home/student/Desktop/OS_HW/hw1/Commands.h
 time.h
 -
+fcntl.h
+-
 
 /home/student/Desktop/OS_HW/hw1/Commands.h
 vector

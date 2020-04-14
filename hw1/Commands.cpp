@@ -7,7 +7,7 @@
 #include <iomanip>
 #include "Commands.h"
 #include <time.h>
-
+#include <fcntl.h>
 
 
 using namespace std;
@@ -329,8 +329,7 @@ void ChpromptCommand::execute() {
 
                                             ///GetCurrDirCommand///
 ///==================================================================================================================///
-GetCurrDirCommand::GetCurrDirCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
-                                                            BuiltInCommand(cmd.c_str(), takes_cpu) {}
+GetCurrDirCommand::GetCurrDirCommand(const string cmd, bool takes_cpu) : BuiltInCommand(cmd.c_str(), takes_cpu) {}
 
 void GetCurrDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
@@ -347,7 +346,7 @@ void GetCurrDirCommand::execute() {
     if(!res){
         perror("smash error: getcwd failed");
     }else {
-        std::cout << path << std::endl;
+        cout << path << endl;
     }
     free(buff);
 }
@@ -355,8 +354,7 @@ void GetCurrDirCommand::execute() {
 
                                             ///ShowPidCommand///
 ///==================================================================================================================///
-ShowPidCommand::ShowPidCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
-                                                            BuiltInCommand(cmd.c_str(), takes_cpu) {}
+ShowPidCommand::ShowPidCommand(const string cmd, bool takes_cpu) : BuiltInCommand(cmd.c_str(), takes_cpu) {}
 
 void ShowPidCommand::execute() {
     //SmallShell& smash = SmallShell::getInstance();
@@ -364,7 +362,11 @@ void ShowPidCommand::execute() {
     /// If any arguments were provided they will be ignored
     ///TODO: Check for errors from getpid system call
     int shellPID = getpid();
-    std::cout << shellPID << std::endl;
+    if (shellPID < 0) {
+        perror("smash error: getpid failed");
+    }
+
+    cout << shellPID << endl;
 
 }
 ///==================================================================================================================///
@@ -384,22 +386,23 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
     currentWD = path;
     
     string lastWDCallBack = "-";
+    string lastWD = smash.getLastWD();
 
     if(numOfArgs == 1) {
         newWD = currentWD;
     }
     else if(numOfArgs > 2){
-        std::cout << "smash error: cd: too many arguments" << std::endl;
+        cout << "smash error: cd: too many arguments" << endl;
         newWD = currentWD;
     }
     // LastPWD isnt set and got "-" argument(havent yet cd in this instance)
-    else if(smash.getLastWD() == "" && args[1] == lastWDCallBack) {
-        std::cout << "smash error: cd: OLDPWD not set" << std::endl;
+    else if(lastWD == "" && args[1] == lastWDCallBack) {
+        cout << "smash error: cd: OLDPWD not set" << endl;
         newWD = currentWD;
     }
     // Handling case if we got "-" as the first argument (and already have done at least one cd call)
     else if(args[1] == lastWDCallBack){
-        newWD = smash.getLastWD();
+        newWD = lastWD;
     }
     // All is find in the world
     else{
@@ -415,7 +418,9 @@ void ChangeDirCommand::execute() {
     if(newWD == currentWD) {
         return;
     }
-    else if(chdir(newWD.c_str()) != 0){
+    /// if res == 0 hakol tov
+    int res = chdir(newWD.c_str());
+    if (res != 0){
         // no cd has been done, so we keep lastWD as is
         perror("smash error: cd failed");
     }
@@ -424,63 +429,165 @@ void ChangeDirCommand::execute() {
     else{
         smash.setLastWD(currentWD);
     }
-    
+}
+///==================================================================================================================///
+
+
+                                                ///CopyCommand///
+///==================================================================================================================///
+CopyCommand::CopyCommand(const char *cmd_line, char **args, int numOfArgs, bool takes_cpu) :
+                                                        BuiltInCommand(cmd_line, takes_cpu), src(""), dest("") {
+    if (numOfArgs > 3) {
+        perror("smash error: too many arguments");      /// change?
+    } else {
+        /// check if pointers are valid
+        if (args[1]) {
+            string src_path = args[1];
+            /// check if the src is from home directory
+            size_t res = src_path.find("~");
+            if (res == 0) {
+                /// get here if it is from home. getting home directory path and adding to rest of src
+                string homeDir = getenv("HOME");
+                src_path = homeDir + src_path.substr(1);
+            }
+            this->src = src_path;
+        }
+        /// doing same as before but for dest
+        if (args[2]) {
+            string dest_path = args[2];
+            size_t res = dest_path.find("~");
+            if (res == 0) {
+                string homeDir = getenv("HOME");
+                dest_path = homeDir + dest_path.substr(1);
+            }
+            this->dest = dest_path;
+        }
+    }
+}
+
+/// fd1 = open src O_RDONLY (if fd1 < 0 go die in hell)
+/// fd2 = open dest O_WRONLY | O_CREAT | O_TRUNC, 0666 (if fd2 < 0 go kill yourself)
+/// buffer[buffer size] = {0}
+/// int count = -1
+/// loop (count != 0)
+///     clear the buffer
+///     count = read(fd1, buffer, buffer size)
+///     if (count == -1) DDDDDIIIIEEEE!!!!!
+///     wCount = write(fd2, buffer, count)
+///     if (wCount == -1) PLEASE PLEASE DIE ALREADY...
+/// close fd1
+/// close fd2
+
+void clearBuffer(char* buffer, int size) {
+    memset(buffer, 0, size);
+}
+///TODO: check file per,issions and shit
+void CopyCommand::execute() {
+    if ((src.compare("") == 0) || (dest.compare("") == 0)) return;
+
+    int src_fd = open(src.c_str(), O_RDONLY);
+    if (src_fd < 0) {
+        perror("smash error: open failed");
+        return;
+    }
+
+    int dest_fd = open(dest.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (dest_fd < 0) {
+        perror("smash error: open failed");
+        return;
+    }
+
+    char buffer[BUFFER_SIZE] = {0};
+    int count = -1;
+    int wCount = -1;
+    while (count != 0) {
+        clearBuffer(buffer, BUFFER_SIZE);
+
+        count = read(src_fd, buffer, BUFFER_SIZE);
+        if (count == -1) {
+            perror("smash error: read failed");
+            return;
+        }
+
+        wCount = write(dest_fd, buffer, count);
+        if (wCount == -1) {
+            perror("smash error: write failed");
+            return;
+        }
+    }
+
+    int res_src, res_dest;
+    res_src = close(src_fd);
+    res_dest = close(dest_fd);
+    if (res_src != 0 || res_dest != 0) {
+        perror("smash error: close failed");
+    }
 }
 ///==================================================================================================================///
 
 
 
-///==================================================================================================================///
+
+
+
+
+
+
+
+
+
+
+
 
                                             ///ExternalCommand///
 ///==================================================================================================================///
 
 
 
-ExternalCommand::ExternalCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
-                                                            Command(cmd.c_str(), takes_cpu) {
+//ExternalCommand::ExternalCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+//                                                            Command(cmd.c_str(), takes_cpu) {
+//
+//    char* firstArg = (char*)malloc(3); ///TODO: Delete here
+//
+//    memset(firstArg, 0, 3);
+//    strcpy(firstArg, "-c");
+//    bashArgs.push_back(firstArg);
+//    for(int i=0; i < numOfArgs; i++){
+//        bashArgs.push_back(args[i]);
+//    }
+//    bashArgs.push_back(nullptr);
+//}
 
-    char* firstArg = (char*)malloc(3); ///TODO: Delete here
-
-    memset(firstArg, 0, 3);
-    strcpy(firstArg, "-c");
-    bashArgs.push_back(firstArg);
-    for(int i=0; i < numOfArgs; i++){
-        bashArgs.push_back(args[i]);
-    }
-    bashArgs.push_back(nullptr);                                          
-}
 
 
-
-void ExternalCommand::execute() {
-
-    ///TODO: What happens in the jobslist?
-    SmallShell& smash = SmallShell::getInstance();
-
-    pid_t pid = fork();
-
-    if(pid == -1){
-        perror("smash error: fork failed");
-    }
-
-    // fork the shell to run the external program
-    if(pid == 0){ //child's code
-        execv("/bin/bash", &bashArgs.front());
-
-    } else {
-        if(takesCPU() == true){ // in the front
-            ///TODO: Question: Should it be waitpid or wait?
-            waitpid(pid, NULL, );
-    }
-        // 
-    // check if the command should run in bg and the child needs to
-        // if so, fork the current shell
-        // add to the jobs list
-    // 
-    
-
-}
+//void ExternalCommand::execute() {
+//
+//    ///TODO: What happens in the jobslist?
+//    SmallShell& smash = SmallShell::getInstance();
+//
+//    pid_t pid = fork();
+//
+//    if(pid == -1){
+//        perror("smash error: fork failed");
+//    }
+//
+//    // fork the shell to run the external program
+//    if(pid == 0){ //child's code
+//        execv("/bin/bash", &bashArgs.front());
+//
+//    } else {
+//        if(takesCPU() == true){ // in the front
+//            ///TODO: Question: Should it be waitpid or wait?
+//            waitpid(pid, NULL, );
+//    }
+//        //
+//    // check if the command should run in bg and the child needs to
+//        // if so, fork the current shell
+//        // add to the jobs list
+//    //
+//
+//
+//}
 ///==================================================================================================================///
 
 
@@ -548,15 +655,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     }
     res = cmdStr.find("pwd");
     if (res == 0) {
-        command = new GetCurrDirCommand(cmd_line, args, numOfArgs, takes_cpu);
+        command = new GetCurrDirCommand(cmd_line, takes_cpu);
     }
     res = cmdStr.find("showpid");
     if (res == 0) {
-        command = new ShowPidCommand(cmd_line, args, numOfArgs, takes_cpu);
+        command = new ShowPidCommand(cmd_line, takes_cpu);
     }
    res = cmdStr.find("cd");
    if (res == 0) {
        command = new ChangeDirCommand(cmd_line, args, numOfArgs, takes_cpu);
+   }
+   res = cmdStr.find("cp");
+   if (res == 0) {
+       command = new CopyCommand(cmd_line, args, numOfArgs, takes_cpu);
    }
 //   res = cmdStr.find("jobs");
 //   if (res == 0) {
@@ -578,9 +689,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 //    if (res == 0) {
 //        command = new QuitCommand(cmd_line);
 //    }
-    else {
-        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
-    }
+//    else {
+//        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
+//    }
 
     /// should not get here
     return command;

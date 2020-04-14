@@ -9,6 +9,7 @@ using namespace std;
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
+#define BUFFER_SIZE (4096)
 
 class Command {
 // TODO: Add your data members
@@ -91,7 +92,7 @@ class GetCurrDirCommand : public BuiltInCommand {
  private:
   /// No private fields as of yet
  public:
-  GetCurrDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
+  GetCurrDirCommand(const string cmd, bool takes_cpu=false);
   virtual ~GetCurrDirCommand() {}
   GetCurrDirCommand(const GetCurrDirCommand&) = default;
   GetCurrDirCommand&operator=(const GetCurrDirCommand&) = default;
@@ -101,7 +102,7 @@ class GetCurrDirCommand : public BuiltInCommand {
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const string cmd, char** argg, int numOfArgs, bool takes_cpu=false);
+  ShowPidCommand(const string cmd, bool takes_cpu=false);
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
@@ -221,8 +222,11 @@ class BackgroundCommand : public BuiltInCommand {
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
- public:
-  CopyCommand(const char* cmd_line);
+private:
+    string src;
+    string dest;
+public:
+  CopyCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
   virtual ~CopyCommand() {}
   void execute() override;
 };
