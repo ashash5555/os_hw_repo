@@ -8,6 +8,8 @@
 #include "Commands.h"
 #include <time.h>
 
+
+
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -46,6 +48,7 @@ string _trim(const std::string& s)
 }
 
 int _parseCommandLine(const char* cmd_line, char** args) {
+///TODO: Free all the args allocated with malloc
   FUNC_ENTRY()
   int i = 0;
   std::istringstream iss(_trim(string(cmd_line)).c_str());
@@ -136,8 +139,6 @@ ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry) {
     os << endl;
     return os;
 }
-
-
 
 JobsList::JobsList() : jobs(vector<JobsList::JobEntry*>()), jobsCount(0) {}
 JobsList::~JobsList() {
@@ -326,11 +327,161 @@ void ChpromptCommand::execute() {
 ///==================================================================================================================///
 
 
+                                            ///GetCurrDirCommand///
+///==================================================================================================================///
+GetCurrDirCommand::GetCurrDirCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                            BuiltInCommand(cmd.c_str(), takes_cpu) {}
+
+void GetCurrDirCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    
+    /// If any arguments were provided they will be ignored
+
+    char *buff = nullptr;
+    size_t bufSize = 0;
+    string path;
+    char *res = nullptr;
+    res = getcwd(buff, bufSize);
+    path = res;
+
+    if(!res){
+        perror("smash error: getcwd failed");
+    }else {
+        std::cout << path << std::endl;
+    }
+    free(buff);
+}
+///==================================================================================================================///
+
+                                            ///ShowPidCommand///
+///==================================================================================================================///
+ShowPidCommand::ShowPidCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                            BuiltInCommand(cmd.c_str(), takes_cpu) {}
+
+void ShowPidCommand::execute() {
+    //SmallShell& smash = SmallShell::getInstance();
+    
+    /// If any arguments were provided they will be ignored
+    ///TODO: Check for errors from getpid system call
+    int shellPID = getpid();
+    std::cout << shellPID << std::endl;
+
+}
+///==================================================================================================================///
+
+
+                                            ///ChangeDirCommand///
+///==================================================================================================================///
+ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                            BuiltInCommand(cmd.c_str(), takes_cpu), newWD(""), currentWD("") {
+    SmallShell& smash = SmallShell::getInstance();
+
+    ///TODO: What happens if getcwd system call fails? What error do we return?
+    char *buf = nullptr;
+    size_t bufSize = 0;
+    string path;
+    path = getcwd(buf, bufSize);
+    currentWD = path;
+    
+    string lastWDCallBack = "-";
+
+    if(numOfArgs == 1) {
+        newWD = currentWD;
+    }
+    else if(numOfArgs > 2){
+        std::cout << "smash error: cd: too many arguments" << std::endl;
+        newWD = currentWD;
+    }
+    // LastPWD isnt set and got "-" argument(havent yet cd in this instance)
+    else if(smash.getLastWD() == "" && args[1] == lastWDCallBack) {
+        std::cout << "smash error: cd: OLDPWD not set" << std::endl;
+        newWD = currentWD;
+    }
+    // Handling case if we got "-" as the first argument (and already have done at least one cd call)
+    else if(args[1] == lastWDCallBack){
+        newWD = smash.getLastWD();
+    }
+    // All is find in the world
+    else{
+        newWD = args[1];
+    }
+    free(buf);
+}
+
+void ChangeDirCommand::execute() {
+
+    SmallShell& smash = SmallShell::getInstance();
+
+    if(newWD == currentWD) {
+        return;
+    }
+    else if(chdir(newWD.c_str()) != 0){
+        // no cd has been done, so we keep lastWD as is
+        perror("smash error: cd failed");
+    }
+
+    //chdir has succeeded and we need to remember the lastWD before cd has been done (saved in currentWD in constructor)
+    else{
+        smash.setLastWD(currentWD);
+    }
+    
+}
+///==================================================================================================================///
 
 
 
+///==================================================================================================================///
+
+                                            ///ExternalCommand///
+///==================================================================================================================///
 
 
+
+ExternalCommand::ExternalCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                            Command(cmd.c_str(), takes_cpu) {
+
+    char* firstArg = (char*)malloc(3); ///TODO: Delete here
+
+    memset(firstArg, 0, 3);
+    strcpy(firstArg, "-c");
+    bashArgs.push_back(firstArg);
+    for(int i=0; i < numOfArgs; i++){
+        bashArgs.push_back(args[i]);
+    }
+    bashArgs.push_back(nullptr);                                          
+}
+
+
+
+void ExternalCommand::execute() {
+
+    ///TODO: What happens in the jobslist?
+    SmallShell& smash = SmallShell::getInstance();
+
+    pid_t pid = fork();
+
+    if(pid == -1){
+        perror("smash error: fork failed");
+    }
+
+    // fork the shell to run the external program
+    if(pid == 0){ //child's code
+        execv("/bin/bash", &bashArgs.front());
+
+    } else {
+        if(takesCPU() == true){ // in the front
+            ///TODO: Question: Should it be waitpid or wait?
+            waitpid(pid, NULL, );
+    }
+        // 
+    // check if the command should run in bg and the child needs to
+        // if so, fork the current shell
+        // add to the jobs list
+    // 
+    
+
+}
+///==================================================================================================================///
 
 
 
@@ -355,7 +506,7 @@ void ChpromptCommand::execute() {
 
                                                 ///SmallShell///
 ///==================================================================================================================///
-SmallShell::SmallShell() : prompt("smash> "){
+SmallShell::SmallShell() : prompt("smash> "), lastWD(""){
 // TODO: add your implementation
 }
 
@@ -390,22 +541,27 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     /// string.find("some string") return the index of the first occurrence of the given string, so we check the
     /// first word.
     ///TODO: we need to send the relevant parameters to each constructor. This is just a skeleton.
+    ///TODO: Does the commands get freed by themselves?
     size_t res = cmdStr.find("chprompt");
     if (res == 0) {
         command = new ChpromptCommand(cmd_line, args, numOfArgs, takes_cpu);
     }
-//    res = cmdStr.find("pwd");
-//    if (res == 0) {
-//        command = new GetCurrDirCommand(cmd_line);
-//    }
-//    res = cmdStr.find("cd");
-//    if (res == 0) {
-//        command = new ChangeDirCommand(cmd_line);
-//    }
-//    res = cmdStr.find("jobs");
-//    if (res == 0) {
-//        command = new JobsCommand(cmd_line);
-//    }
+    res = cmdStr.find("pwd");
+    if (res == 0) {
+        command = new GetCurrDirCommand(cmd_line, args, numOfArgs, takes_cpu);
+    }
+    res = cmdStr.find("showpid");
+    if (res == 0) {
+        command = new ShowPidCommand(cmd_line, args, numOfArgs, takes_cpu);
+    }
+   res = cmdStr.find("cd");
+   if (res == 0) {
+       command = new ChangeDirCommand(cmd_line, args, numOfArgs, takes_cpu);
+   }
+//   res = cmdStr.find("jobs");
+//   if (res == 0) {
+//       command = new JobsCommand(cmd_line);
+//   }
 //    res = cmdStr.find("kill");
 //    if (res == 0) {
 //        command = new KillCommand(cmd_line);
@@ -422,9 +578,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 //    if (res == 0) {
 //        command = new QuitCommand(cmd_line);
 //    }
-//    else {
-//        command = new ExternalCommand(cmd_line);
-//    }
+    else {
+        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
+    }
 
     /// should not get here
     return command;
@@ -442,4 +598,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
 
 string SmallShell::getPrompt() const { return prompt;}
 void SmallShell::setPrompt(string newPrompt) {prompt = newPrompt;}
+string SmallShell::getLastWD() const { return lastWD;}
+void SmallShell::setLastWD(string path) {lastWD = path;}
 ///==================================================================================================================///

@@ -34,8 +34,10 @@ class BuiltInCommand : public Command {
 };
 
 class ExternalCommand : public Command {
+ private:
+  vector<char*> bashArgs;
  public:
-  ExternalCommand(const char* cmd_line);
+  ExternalCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu);
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -58,23 +60,48 @@ class RedirectionCommand : public Command {
   //void cleanup() override;
 };
 
+class ChpromptCommand : public BuiltInCommand {
+private:
+    string new_prompt;
+
+public:
+    ChpromptCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
+    ChpromptCommand(const ChpromptCommand&) = default;
+    ChpromptCommand&operator=(const ChpromptCommand&) = default;
+    ~ChpromptCommand() = default;
+
+    void execute() override;
+};
+
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
+private:
+  string newWD;
+  string currentWD;
+public:
+  ChangeDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
+  ChangeDirCommand(const ChangeDirCommand&) = default;
+  ChangeDirCommand&operator=(const ChangeDirCommand&) = default;
   virtual ~ChangeDirCommand() {}
+
   void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
+ private:
+  /// No private fields as of yet
  public:
-  GetCurrDirCommand(const char* cmd_line);
+  GetCurrDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
   virtual ~GetCurrDirCommand() {}
+  GetCurrDirCommand(const GetCurrDirCommand&) = default;
+  GetCurrDirCommand&operator=(const GetCurrDirCommand&) = default;
+
   void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  ShowPidCommand(const string cmd, char** argg, int numOfArgs, bool takes_cpu=false);
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
@@ -203,23 +230,13 @@ class CopyCommand : public BuiltInCommand {
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
 
-class ChpromptCommand : public BuiltInCommand {
-private:
-    string new_prompt;
 
-public:
-    ChpromptCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
-    ChpromptCommand(const ChpromptCommand&) = default;
-    ChpromptCommand&operator=(const ChpromptCommand&) = default;
-    ~ChpromptCommand() = default;
-
-    void execute() override;
-};
 
 class SmallShell {
  private:
   // TODO: Add your data members
   string prompt;
+  string lastWD;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -235,6 +252,8 @@ class SmallShell {
   void executeCommand(const char* cmd_line);
   void setPrompt(string newPrompt);
   string getPrompt() const;
+  void setLastWD(string path);
+  string getLastWD() const;
   // TODO: add extra methods as needed
 };
 
