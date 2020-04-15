@@ -16,7 +16,6 @@ class Command {
 private:
     string cmd;
     bool takes_cpu;
-    bool exeternal = false;
  public:
   Command(const char* cmd_line, bool takesCPU);
   virtual ~Command() = default;
@@ -193,8 +192,12 @@ class ForegroundCommand : public BuiltInCommand {
 
 class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
+ private:
+  int jobID;
+  int jobToStopID;
+  JobsList::JobEntry* jobToStop;
  public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
+  BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs);
   virtual ~BackgroundCommand() {}
   void execute() override;
 };

@@ -528,18 +528,6 @@ void CopyCommand::execute() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
                                             ///ExternalCommand///
 ///==================================================================================================================///
 
@@ -584,7 +572,70 @@ void ExternalCommand::execute() {
 ///==================================================================================================================///
 
 
+                                            ///BackgroundCommand///
+///==================================================================================================================///
 
+BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false, JobsList* jobs) :
+                                        BuiltInCommand(cmd.c_str(), takes_cpu), jobID(-1), jobToStopID(-1) {
+        stringstream strStm(args[1]);
+        strStm >> jobID;
+        if(numOfArgs > 2 || !isdigit(jobID)) {
+            perror("smash error: bg: invalid arguments");
+            return;
+        }
+
+        JobsList::JobEntry* job = jobs->getJobById(jobID);
+        if(!job) {
+            cout << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
+            return;
+        }
+
+        bool isStopped = job->isJobStopped();
+        if(!isStopped) {
+            cout << "smash error: bg: job-id " << jobID <<" is already running in the background" << endl;
+            return;
+        }
+
+        this->jobToStopID = jobID;
+        this->jobToStop = job;
+
+        int foundStoppedID;
+        JobsList::JobEntry* foundStoppedJob  = jobs->getLastStoppedJob(&foundStoppedID);
+        if(numOfArgs == 1){
+            if(!foundStoppedJob) {
+                cout << "smash error: bg: there is no stopped jobs to resume" << endl;
+                return;
+            } else { //using bg without arguments
+                this->jobToStopID = foundStoppedID;
+                this->jobToStop = foundStoppedJob;
+            }
+        }
+
+}
+
+void BackgroundCommand::execute() {
+
+    //no execution if command was bad
+    if(jobToStopID <= 0) {return;}
+
+    string cmd = jobToStop->getJobCmd();
+    int pidToCont;
+    pidToCont = jobToStop->getJobPID();
+    cout << cmd << " : " << pidToCont << endl;
+
+    
+
+    int res = kill(pidToCont, SIGCONT);
+    if(res != 0) {
+        perror("smash error: kill failed");
+    } else {
+        //manage JobsList
+        jobToStop->resumeJob();
+    }
+    
+}
+
+///==================================================================================================================///
 
 
 
@@ -673,10 +724,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 //    if (res == 0) {
 //        command = new ForegroundCommand(cmd_line);
 //    }
-//    res = cmdStr.find("bg");
-//    if (res == 0) {
-//        command = new BackgroundCommand(cmd_line);
-//    }
+    res = cmdStr.find("bg");
+    if (res == 0) {
+        command = new BackgroundCommand(cmd_line, args, numOfArgs); //TODO: Can it take &?
+   }
 //    res = cmdStr.find("quit");
 //    if (res == 0) {
 //        command = new QuitCommand(cmd_line);
