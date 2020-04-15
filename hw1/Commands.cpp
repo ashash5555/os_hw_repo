@@ -551,7 +551,7 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
     stringstream jobIdStr(args[2]);
     jobIdStr >> this->jobID;
 
-    if (dash.compare("-") != 0 || !isdigit(signal) || !isdigit(jobID)) {
+    if (dash.compare("-") != 0 || !isdigit(signal) || !isdigit(jobID)) {    /// change this condition to check the string!
         perror("smash error: kill: invalid arguments");
     }
 }
@@ -581,8 +581,62 @@ void KillCommand::execute() {
 ///==================================================================================================================///
 
 
+                                            ///ForegroundCommand///
+///==================================================================================================================///
+ForegroundCommand::ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu) :
+                                                            BuiltInCommand(cmd_line, takes_cpu), jobID(-1), jobs(jobs) {
+    /// check more options?
+    if (numOfArgs > 2) {
+        perror("smash error: fg: invalid arguments");
+    }
+    /// no job id given
+    if (!args[1]) jobID = -1;
 
-///BackgroundCommand///
+    /// job id given
+    else {
+        stringstream jobIdStr(args[1]);
+        jobIdStr >> this->jobID;
+            /// change this condition to check the string!
+//        if (!isdigit(jobID)) {
+//            perror("smash error: fg: invalid arguments");
+//        }
+    }
+}
+
+void ForegroundCommand::execute() {
+    JobsList::JobEntry* job = nullptr;
+    if (jobID > 0) {
+        job = jobs->getJobById(jobID);
+        if (!job) {
+            string jobIdStr = to_string(jobID);
+            string errMsg = "smash error: kill: job-id " + jobIdStr + "does not exist";
+            perror(errMsg.c_str());
+        }
+    } else {        /// jobID == -1
+        job = jobs->getLastJob(&jobID);
+        if (!job) {
+            perror("smash error: fg: jobs list is empty"); /// just print and return instead?
+        }
+    }
+
+    pid_t pid = job->getJobPID();
+    string cmd = job->getJobCmd();
+    cout << cmd << " : " << pid << endl;
+
+    bool isStopped = job->isJobStopped();
+    if (isStopped) {
+        job->resumeJob();
+        kill(pid, SIGCONT);     /// we return the job to continue, else it is already running in the background
+    }
+
+    waitpid(pid, NULL, WUNTRACED);   /// "bring job to foreground" by waiting for it to finish
+}
+///==================================================================================================================///
+
+
+
+
+                                            ///BackgroundCommand///
 ///==================================================================================================================///
 
 BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
@@ -766,22 +820,22 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     }
     res = cmdStr.find("kill");
     if (res == 0) {
-        command = new KillCommand(cmd_line, args, numOfArgs, jobList, takes_cpu);
+        command = new KillCommand(cmd_line, args, numOfArgs, jobList, takes_cpu);   /// this is working but still need to change some checks
         return command;
     }
-//    res = cmdStr.find("fg");
-//    if (res == 0) {
-//        command = new ForegroundCommand(cmd_line);
-//        return command;
-//    }
-//    res = cmdStr.find("bg");
-//    if (res == 0) {
-//        command = new BackgroundCommand(cmd_line);
-//        return command;
-//    }
+    res = cmdStr.find("fg");
+    if (res == 0) {
+        command = new ForegroundCommand(cmd_line, args, numOfArgs, jobList, takes_cpu); /// this is working but still need to change some checks
+        return command;
+    }
+    res = cmdStr.find("bg");
+    if (res == 0) {
+        command = new BackgroundCommand(cmd_line, args, numOfArgs, takes_cpu, jobList);
+        return command;
+    }
 //    res = cmdStr.find("quit");
 //    if (res == 0) {
-//        command = new QuitCommand(cmd_line);
+//        command = new QuitCommand(cmd_line, args, );
 //        return command;
 //    }
     else {

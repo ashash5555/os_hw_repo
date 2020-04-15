@@ -216,8 +216,11 @@ public:
 
 class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
+private:
+    int jobID;
+    JobsList* jobs;
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
