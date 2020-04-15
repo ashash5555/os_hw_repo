@@ -110,7 +110,11 @@ class ShowPidCommand : public BuiltInCommand {
 class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
+private:
+  JobsList* jobs;
+  bool isKilling;
+public:
+  QuitCommand(const string cmd, char** args, int numOfStrings, bool takes_cpu, JobsList* jobs);
   virtual ~QuitCommand() {}
   void execute() override;
 };
@@ -163,23 +167,31 @@ public:
 
     const int getJobsCount() const;
     void updateJobsCount();
+    int getTotalJobs() const;
 };
 ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
+ private:	
+    JobsList* jobs;	
+ public:	
+  JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);	
+  virtual ~JobsCommand() = default;
   void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~KillCommand() {}
-  void execute() override;
+ 	private:	
+    int signal;	
+    int jobID;	
+    pid_t jobPID;	
+    JobsList* jobs;	
+  public:	
+    KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);	
+    virtual ~KillCommand() = default;
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
@@ -195,6 +207,7 @@ class BackgroundCommand : public BuiltInCommand {
  private:
   int jobID;
   int jobToStopID;
+  JobsList* jobs;
   JobsList::JobEntry* jobToStop;
  public:
   BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs);

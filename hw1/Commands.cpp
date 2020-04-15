@@ -116,6 +116,7 @@ bool JobsList::JobEntry::isJobStopped() const { return isStopped;}
 void JobsList::JobEntry::setJobID(int id) {jobID = id;}
 void JobsList::JobEntry::stopJob() {isStopped = true;}
 void JobsList::JobEntry::resumeJob() {isStopped = false;}
+int JobsList::getTotalJobs() const {return jobs.size();}
 
 /// Prints the job entry as one line: '[<job-id>] <command> : <process-id> <seconds-elapsed> secs (stopped)'
 /// \param os - ostream object (file descriptor)
@@ -141,19 +142,19 @@ ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry) {
 }
 
 JobsList::JobsList() : jobs(vector<JobsList::JobEntry*>()), jobsCount(0) {}
-JobsList::~JobsList() {
-    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
-    vector<JobsList::JobEntry*>::iterator tempIt = it;
-    for (; it != jobs.end(); ++it) {
-        if (*it) {
-            delete *it;
-            *it = nullptr;
-            /// because iterator is undefined after erase
-            tempIt = it;
-            jobs.erase(it);
-            it = tempIt;
-        }
-    }
+
+JobsList::~JobsList() {	
+vector<JobsList::JobEntry*>::iterator it = jobs.begin();	
+while (it != jobs.end()) {	
+    if (*it) {	
+        delete *it;	
+        *it = nullptr;	
+        /// because iterator is undefined after erase	
+        it = jobs.erase(it);	
+    } else {	
+        ++it;	
+    }	
+}	
 }
 
 int JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
@@ -172,7 +173,7 @@ void JobsList::printJobsList() {
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
     for (; it != jobs.end(); ++it) {
         if (*it) {
-            cout << *it;
+            cout << *(*it);
         }
     }
 }
@@ -180,9 +181,12 @@ void JobsList::printJobsList() {
 void JobsList::killAllJobs() {
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
     vector<JobsList::JobEntry*>::iterator tempIt = it;
+    //TODO: Assuming that number of total jobs is 
     for (; it != jobs.end(); ++it) {
         if (*it) {
             pid_t pid = (*it)->getJobPID();
+            string cmd = (*it)->getJobCmd();
+            cout << pid << ": " << cmd;
             kill(pid, SIGKILL);    /// check return status?
 
             delete *it;
@@ -196,27 +200,26 @@ void JobsList::killAllJobs() {
     updateJobsCount();
 }
 
-void JobsList::removeFinishedJobs() {
-    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
-    vector<JobsList::JobEntry*>::iterator tempIt = it;
-    int res;
-    for (; it != jobs.end(); ++it) {
-        if (*it) {
-            pid_t pid = (*it)->getJobPID();
-            /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running
-            res = waitpid(pid, nullptr, WNOHANG);
-            if (res > 0) {
-                /// gets here if this process finished
-                delete *it;
-                *it = nullptr;
-                /// because iterator is undefined after erase
-                tempIt = it;
-                jobs.erase(it);
-                it = tempIt;
-            }
-        }
-    }
-    updateJobsCount();
+void JobsList::removeFinishedJobs() {	
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();	
+    int res;	
+    while (it != jobs.end()) {	
+        if (*it) {	
+            pid_t pid = (*it)->getJobPID();	
+            /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running	
+            res = waitpid(pid, NULL, WNOHANG);   /// for some reason returns pid even when process is running	
+            if (res > 0) {	
+                /// gets here if this process finished	
+                delete *it;	
+                *it = nullptr;	
+                /// because iterator is undefined after erase (erase advances the iterator)	
+                it = jobs.erase(it);	
+            } else {	
+                ++it;	
+            }	
+        }	
+    }	
+    updateJobsCount();	
 }
 
 JobsList::JobEntry* JobsList::getJobById(int jobId) {
@@ -524,6 +527,51 @@ void CopyCommand::execute() {
         perror("smash error: close failed");
     }
 }
+
+
+	                                            ///JobsCommand///	
+///==================================================================================================================///	
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs, bool takes_cpu) : BuiltInCommand(cmd_line, takes_cpu),	
+                                                                                                            jobs(jobs){}	
+void JobsCommand::execute() {jobs->printJobsList();}
+
+///==================================================================================================================///
+
+	                                             ///KillCommand///	
+///==================================================================================================================///	
+KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsList *jobs, bool takes_cpu) :	
+                                                BuiltInCommand(cmd_line, takes_cpu), signal(-1), jobID(-1), jobs(jobs) {	
+    if (numOfArgs > 3 || !args[1] || !args[2] || args[3]) {	
+        perror("smash error: kill: invalid arguments");	
+    }	
+    string dash;	
+    stringstream sigStr(args[1]);	
+    sigStr >> dash >> this->signal;	
+    stringstream jobIdStr(args[2]);	
+    jobIdStr >> this->jobID;	
+    if (dash.compare("-") != 0 || !isdigit(signal) || !isdigit(jobID)) {	
+        perror("smash error: kill: invalid arguments");	
+    }	
+}	
+void KillCommand::execute() {	
+    if (signal < 0 || jobID < 0) return;	
+    JobsList::JobEntry* job = jobs->getJobById(jobID);	
+    if (!job) {	
+        string jobIdStr = to_string(jobID);	
+        string errMsg = "smash error: kill: job-id " + jobIdStr + "does not exist";	
+        perror(errMsg.c_str());	
+    }	
+    jobPID = job->getJobPID();	
+    int res = kill(jobPID, signal);	
+    if (res != 0) {	
+        perror("smash error: kill failed");	
+    } else {	
+        string sigStr = to_string(signal);	
+        string pidStr = to_string(jobPID);	
+        string msg = "signal number " + sigStr + "was sent to pid " + pidStr;	
+        cout << msg << endl;	
+    }	
+}	
 ///==================================================================================================================///
 
 
@@ -575,8 +623,8 @@ void ExternalCommand::execute() {
                                             ///BackgroundCommand///
 ///==================================================================================================================///
 
-BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false, JobsList* jobs) :
-                                        BuiltInCommand(cmd.c_str(), takes_cpu), jobID(-1), jobToStopID(-1) {
+BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
+                                        BuiltInCommand(cmd.c_str(), takes_cpu), jobID(-1), jobToStopID(-1), jobs(jobs) {
         stringstream strStm(args[1]);
         strStm >> jobID;
         if(numOfArgs > 2 || !isdigit(jobID)) {
@@ -640,13 +688,35 @@ void BackgroundCommand::execute() {
 
 
 
+                                            ///QuitCommand///
+///==================================================================================================================///
+
+QuitCommand::QuitCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) : 
+                                    BuiltInCommand(cmd.c_str(), takes_cpu), jobs(jobs), isKilling(false)
+{
+    string killArg = "kill";
+    if(killArg == args[1]) { // delete all working or stopped jobs
+        isKilling = true;
+    }
+    //otherwise ignore all else
+}
+
+void QuitCommand::execute() {
+    
+    if(!isKilling) return;
+    
+    jobs->removeFinishedJobs(); //removing for correct vector size => total jobs to kill
+
+    int numKillsToDo = jobs->getTotalJobs();
+    cout << "smash: sending SIGKILL to " << numKillsToDo << " jobs:" << endl;
+
+    jobs->killAllJobs(); //printing done inside + kills. The messacare!
+}
 
 
 
 
-
-
-
+///==================================================================================================================///
 
 
 
@@ -657,130 +727,137 @@ void BackgroundCommand::execute() {
 
                                                 ///SmallShell///
 ///==================================================================================================================///
-SmallShell::SmallShell() : prompt("smash> "), lastWD(""){
-// TODO: add your implementation
+SmallShell::SmallShell() : prompt("smash> "), lastWD(""), jobList(new JobsList()){	
+// TODO: add your implementation	
+}	
+SmallShell::~SmallShell() {	
+// TODO: add your implementation	
+}	
+/// Creates and returns a pointer to Command class which matches the given command line (cmd_line).	
+/// \param cmd_line - the command line to return its' relevant Command class.	
+/// \return A pointer to the Command object for the given command line or nullptr if no matching class was found.	
+Command * SmallShell::CreateCommand(const char* cmd_line) {	
+    string cmdStr = string(cmd_line);	
+    cmdStr = _trim(cmdStr);	
+    /// params to send to constructors	
+    bool takes_cpu = !_isBackgroundComamnd(cmd_line);	
+    char** args = new char*[COMMAND_MAX_ARGS];	
+    int numOfArgs = _parseCommandLine(cmd_line, args);	
+    /// remove the background sign if needed	
+    char* cmdChar = new char[cmdStr.length() + 1];	
+    strcpy(cmdChar, cmdStr.c_str());	
+    if (!takes_cpu) {	
+        /// if we got here, the command needs to run in the background	
+        _removeBackgroundSign(cmdChar);	
+        cmdStr = string(cmdChar);	
+    }	
+    Command* command = nullptr;	
+    /// check what command was sent and returns the relevant command object	
+    /// string.find("some string") return the index of the first occurrence of the given string, so we check the	
+    /// first word.	
+    ///TODO: we need to send the relevant parameters to each constructor. This is just a skeleton.	
+    ///TODO: Does the commands get freed by themselves?	
+    size_t res = cmdStr.find("chprompt");	
+    if (res == 0) {	
+        command = new ChpromptCommand(cmd_line, args, numOfArgs, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("pwd");	
+    if (res == 0) {	
+        command = new GetCurrDirCommand(cmd_line, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("showpid");	
+    if (res == 0) {	
+        command = new ShowPidCommand(cmd_line, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("cd");	
+    if (res == 0) {	
+        command = new ChangeDirCommand(cmd_line, args, numOfArgs, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("cp");	
+    if (res == 0) {	
+        command = new CopyCommand(cmd_line, args, numOfArgs, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("jobs");	
+    if (res == 0) {	
+        command = new JobsCommand(cmd_line, jobList, takes_cpu);	
+        return command;	
+    }	
+    res = cmdStr.find("kill");	
+    if (res == 0) {	
+        command = new KillCommand(cmd_line, args, numOfArgs, jobList, takes_cpu);	
+        return command;	
+    }	
+//    res = cmdStr.find("fg");	
+//    if (res == 0) {	
+//        command = new ForegroundCommand(cmd_line);	
+//        return command;	
+//    }	
+    res = cmdStr.find("bg");	
+    if (res == 0) {	
+        command = new BackgroundCommand(cmd_line, args, numOfArgs, takes_cpu, jobList);	
+        return command;	
+    }	
+    res = cmdStr.find("quit");	
+    if (res == 0) {	
+       command = new QuitCommand(cmd_line, args, numOfArgs, takes_cpu, jobList);	
+        return command;	
+    }	
+    else {	
+        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);	
+    }	
+    /// should not get here	
+    return command;	
 }
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
-}
+	void SmallShell::executeCommand(const char *cmd_line) {	
+    Command* cmd = CreateCommand(cmd_line);	
+    if(!cmd) return;	
+    //TODO: clear finished jobs	
+    bool isExternal = (typeid(*cmd) == typeid(ExternalCommand));	
+    bool isCopy = (typeid(*cmd) == typeid(CopyCommand));
+    bool isQuit = (typeid(*cmd) == typeid(QuitCommand));
+    if (isExternal || isCopy || isQuit) {	
+        pid_t pid = fork();	
+        if(pid == -1) {	
+            perror("smash error: fork failed");	
+            //TODO: return?	
+        }	
+        if(pid == 0){ //Child	
+            setpgrp();
+            cmd->execute();	//On Quit will go to clear children. Const. will determine if clean up needed
+            delete cmd;	
+            exit(0);	
+        } else { //Parent	
+            //TODO: add job
+            if(isQuit) {
+                waitpid(pid, NULL, WUNTRACED);
+                delete cmd;
+                exit(0);
+            }	
+            bool takesCPU = cmd->takesCPU();	
+            if (takesCPU) {	
+                waitpid(pid, NULL, WUNTRACED);	
+                delete cmd;	
+//                //remove	
+//                jobList->removeJobById(addedChildJobId);	
+            } else {	
+                //TODO: clear finished jobs	
+                jobList->removeFinishedJobs();	
+                jobList->addJob(cmd, pid, false);//isStopped=false	
+            }	
+            jobList->removeFinishedJobs();	
+        }	
+    }	
+    else {	
+        cmd->execute();	
+    }	
+}	
 
-/// Creates and returns a pointer to Command class which matches the given command line (cmd_line).
-/// \param cmd_line - the command line to return its' relevant Command class.
-/// \return A pointer to the Command object for the given command line or nullptr if no matching class was found.
-Command * SmallShell::CreateCommand(const char* cmd_line) {
-    string cmdStr = string(cmd_line);
-    cmdStr = _trim(cmdStr);
-
-    /// params to send to constructors
-    bool takes_cpu = !_isBackgroundComamnd(cmd_line);
-    char** args = new char*[COMMAND_MAX_ARGS];
-    int numOfArgs = _parseCommandLine(cmd_line, args);
-
-    /// remove the background sign if needed
-    char* cmdChar = new char[cmdStr.length() + 1];
-    strcpy(cmdChar, cmdStr.c_str());
-    if (!takes_cpu) {
-        /// if we got here, the command needs to run in the background
-        _removeBackgroundSign(cmdChar);
-        cmdStr = string(cmdChar);
-    }
-    Command* command = nullptr;
-
-    /// check what command was sent and returns the relevant command object
-    /// string.find("some string") return the index of the first occurrence of the given string, so we check the
-    /// first word.
-    ///TODO: we need to send the relevant parameters to each constructor. This is just a skeleton.
-    ///TODO: Does the commands get freed by themselves?
-    size_t res = cmdStr.find("chprompt");
-    if (res == 0) {
-        command = new ChpromptCommand(cmd_line, args, numOfArgs, takes_cpu);
-    }
-    res = cmdStr.find("pwd");
-    if (res == 0) {
-        command = new GetCurrDirCommand(cmd_line, takes_cpu);
-    }
-    res = cmdStr.find("showpid");
-    if (res == 0) {
-        command = new ShowPidCommand(cmd_line, takes_cpu);
-    }
-   res = cmdStr.find("cd");
-   if (res == 0) {
-       command = new ChangeDirCommand(cmd_line, args, numOfArgs, takes_cpu);
-   }
-   res = cmdStr.find("cp");
-   if (res == 0) {
-       command = new CopyCommand(cmd_line, args, numOfArgs, takes_cpu);
-   }
-//   res = cmdStr.find("jobs");
-//   if (res == 0) {
-//       command = new JobsCommand(cmd_line);
-//   }
-//    res = cmdStr.find("kill");
-//    if (res == 0) {
-//        command = new KillCommand(cmd_line);
-//    }
-//    res = cmdStr.find("fg");
-//    if (res == 0) {
-//        command = new ForegroundCommand(cmd_line);
-//    }
-    res = cmdStr.find("bg");
-    if (res == 0) {
-        command = new BackgroundCommand(cmd_line, args, numOfArgs); //TODO: Can it take &?
-   }
-//    res = cmdStr.find("quit");
-//    if (res == 0) {
-//        command = new QuitCommand(cmd_line);
-//    }
-    else {
-        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
-   }
-
-    /// should not get here
-    return command;
-}
-
-void SmallShell::executeCommand(const char *cmd_line) {
-    Command* cmd = CreateCommand(cmd_line);
-
-    if(!cmd) return;
-
-    //TODO: clear finished jobs
-    jobList->removeFinishedJobs();
-
-    pid_t pid = fork();
-
-    if(pid == -1) {
-        perror("smash error: fork failed");
-        //TODO: return?
-    }
-
-    if(pid == 0){ //Child
-        setpgrp();
-        cmd->execute();
-        delete cmd;
-        exit(0);
-
-    } else { //Parent
-
-        //TODO: add job
-        int addedChildJobId = jobList->addJob(cmd, pid, false);//isStopped=false
-        bool res = cmd->takesCPU();
-        if(res){
-            waitpid(pid,NULL,WUNTRACED);
-            //remove
-            jobList->removeJobById(addedChildJobId);
-        } else {
-            //TODO: clear finished jobs
-            jobList->removeFinishedJobs();
-        }
-        delete cmd;
-        
-    }
-
-    
-
-}
 
 string SmallShell::getPrompt() const { return prompt;}
 void SmallShell::setPrompt(string newPrompt) {prompt = newPrompt;}
