@@ -170,7 +170,7 @@ void JobsList::printJobsList() {
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
     for (; it != jobs.end(); ++it) {
         if (*it) {
-            cout << *it;
+            cout << *(*it);
         }
     }
 }
@@ -201,7 +201,7 @@ void JobsList::removeFinishedJobs() {
         if (*it) {
             pid_t pid = (*it)->getJobPID();
             /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running
-            res = waitpid(pid, nullptr, WNOHANG);   /// for some reason returns pid even when process is running
+            res = waitpid(pid, NULL, WNOHANG);   /// for some reason returns pid even when process is running
             if (res > 0) {
                 /// gets here if this process finished
                 delete *it;
@@ -593,6 +593,7 @@ void ExternalCommand::execute() {
 
     string cmdStr = this->getCommand();
     char* cmdChar = const_cast<char*> (cmdStr.c_str());
+    _removeBackgroundSign(cmdChar);
 
     char* const argv[4] = {const_cast<char*>("bash"), const_cast<char*>("-c"), cmdChar, NULL};
     execv("/bin/bash", argv);
@@ -735,7 +736,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 jobList->addJob(cmd, pid, false);//isStopped=false
             }
             jobList->removeFinishedJobs();
-            delete cmd;
         }
     }
 
