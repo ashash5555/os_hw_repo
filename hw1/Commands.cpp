@@ -527,12 +527,58 @@ void CopyCommand::execute() {
 
 
 
+                                            ///JobsCommand///
+///==================================================================================================================///
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs, bool takes_cpu) : BuiltInCommand(cmd_line, takes_cpu),
+                                                                                                            jobs(jobs){}
+void JobsCommand::execute() {jobs->printJobsList();}
+///==================================================================================================================///
 
 
 
+                                             ///KillCommand///
+///==================================================================================================================///
+KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsList *jobs, bool takes_cpu) :
+                                                BuiltInCommand(cmd_line, takes_cpu), signal(-1), jobID(-1), jobs(jobs) {
+    if (numOfArgs > 3 || !args[1] || !args[2] || args[3]) {
+        perror("smash error: kill: invalid arguments");
+    }
 
+    string dash;
+    stringstream sigStr(args[1]);
+    sigStr >> dash >> this->signal;
 
+    stringstream jobIdStr(args[0]);
+    jobIdStr >> this->jobID;
 
+    if (dash.compare("-") != 0 || !isdigit(signal) || !isdigit(jobID)) {
+        perror("smash error: kill: invalid arguments");
+    }
+}
+
+void KillCommand::execute() {
+    if (signal < 0 || jobID < 0) return;
+
+    JobsList::JobEntry* job = jobs->getJobById(jobID);
+    if (!job) {
+        string jobIdStr = to_string(jobID);
+        string errMsg = "smash error: kill: job-id " + jobIdStr + "does not exist";
+        perror(errMsg.c_str());
+    }
+
+    jobPID = job->getJobPID();
+
+    int res = kill(jobPID, signal);
+    if (res != 0) {
+        perror("smash error: kill failed");
+    } else {
+        string sigStr = to_string(signal);
+        string pidStr = to_string(jobPID);
+        string msg = "signal number " + sigStr + "was sent to pid " + pidStr;
+        cout << msg << endl;
+    }
+}
+///==================================================================================================================///
 
 
 

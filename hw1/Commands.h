@@ -103,7 +103,7 @@ class GetCurrDirCommand : public BuiltInCommand {
 class ShowPidCommand : public BuiltInCommand {
  public:
   ShowPidCommand(const string cmd, bool takes_cpu=false);
-  virtual ~ShowPidCommand() {}
+  virtual ~ShowPidCommand() = default;
   void execute() override;
 };
 
@@ -115,26 +115,26 @@ class QuitCommand : public BuiltInCommand {
   void execute() override;
 };
 
-class CommandsHistory {
- protected:
-  class CommandHistoryEntry {
-	  // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  CommandsHistory();
-  ~CommandsHistory() {}
-  void addRecord(const char* cmd_line);
-  void printHistory();
-};
-
-class HistoryCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  HistoryCommand(const char* cmd_line, CommandsHistory* history);
-  virtual ~HistoryCommand() {}
-  void execute() override;
-};
+//class CommandsHistory {
+// protected:
+//  class CommandHistoryEntry {
+//	  // TODO: Add your data members
+//  };
+// // TODO: Add your data members
+// public:
+//  CommandsHistory();
+//  ~CommandsHistory() {}
+//  void addRecord(const char* cmd_line);
+//  void printHistory();
+//};
+//
+//class HistoryCommand : public BuiltInCommand {
+// // TODO: Add your data members
+// public:
+//  HistoryCommand(const char* cmd_line, CommandsHistory* history);
+//  virtual ~HistoryCommand() {}
+//  void execute() override;
+//};
 
 class JobsList {
 public:
@@ -189,17 +189,25 @@ ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
+private:
+    JobsList* jobs;
+public:
+  JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);
+  virtual ~JobsCommand() = default;
   void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~KillCommand() {}
+private:
+    int signal;
+    int jobID;
+    pid_t jobPID;
+    JobsList* jobs;
+
+public:
+  KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);
+  virtual ~KillCommand() = default;
   void execute() override;
 };
 
