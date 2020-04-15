@@ -156,7 +156,7 @@ JobsList::~JobsList() {
     }
 }
 
-void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
+int JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     this->removeFinishedJobs();
     this->jobsCount++;
     int jobID = jobsCount;
@@ -164,6 +164,7 @@ void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
 
     JobEntry* jobToAdd = new JobEntry(jobID, pid, cmdStr, isStopped);
     jobs.push_back(jobToAdd);
+    return jobID;
 }
 
 void JobsList::printJobsList() {
@@ -544,50 +545,42 @@ void CopyCommand::execute() {
 
 
 
-//ExternalCommand::ExternalCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
-//                                                            Command(cmd.c_str(), takes_cpu) {
-//
-//    char* firstArg = (char*)malloc(3); ///TODO: Delete here
-//
-//    memset(firstArg, 0, 3);
-//    strcpy(firstArg, "-c");
-//    bashArgs.push_back(firstArg);
-//    for(int i=0; i < numOfArgs; i++){
-//        bashArgs.push_back(args[i]);
-//    }
-//    bashArgs.push_back(nullptr);
-//}
+ExternalCommand::ExternalCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
+                                                           Command(cmd.c_str(), takes_cpu) {
+
+   char* firstArg = (char*)malloc(3); ///TODO: Delete here
+
+   memset(firstArg, 0, 3);
+   strcpy(firstArg, "-c");
+   bashArgs.push_back(firstArg);
+   for(int i=0; i < numOfArgs; i++){
+       bashArgs.push_back(args[i]);
+   }
+   bashArgs.push_back(nullptr);
+
+}
 
 
+void ExternalCommand::execute() {
 
-//void ExternalCommand::execute() {
-//
-//    ///TODO: What happens in the jobslist?
-//    SmallShell& smash = SmallShell::getInstance();
-//
-//    pid_t pid = fork();
-//
-//    if(pid == -1){
-//        perror("smash error: fork failed");
-//    }
-//
-//    // fork the shell to run the external program
-//    if(pid == 0){ //child's code
-//        execv("/bin/bash", &bashArgs.front());
-//
-//    } else {
-//        if(takesCPU() == true){ // in the front
-//            ///TODO: Question: Should it be waitpid or wait?
-//            waitpid(pid, NULL, );
-//    }
-//        //
-//    // check if the command should run in bg and the child needs to
-//        // if so, fork the current shell
-//        // add to the jobs list
-//    //
-//
-//
-//}
+   ///TODO: What happens in the jobslist? We can add it in the constructor if it succeeds.
+   ///Execution is handles in execute and joblist management is not here
+   SmallShell& smash = SmallShell::getInstance();
+
+
+   string bashPath = "/bin/bash";
+    
+    //for testing
+    string bashCheck;
+    string temp;
+    for(char* argument : bashArgs){
+        temp = argument;
+        bashCheck += temp;
+    }
+
+    execv(bashPath.c_str(), &bashArgs[0]);
+    perror("smash error: execv failed");
+}
 ///==================================================================================================================///
 
 
@@ -641,7 +634,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         _removeBackgroundSign(cmdChar);
         cmdStr = string(cmdChar);
     }
-
     Command* command = nullptr;
 
     /// check what command was sent and returns the relevant command object
@@ -689,9 +681,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 //    if (res == 0) {
 //        command = new QuitCommand(cmd_line);
 //    }
-//    else {
-//        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
-//    }
+    else {
+        command = new ExternalCommand(cmd_line, args, numOfArgs, takes_cpu);
+   }
 
     /// should not get here
     return command;
@@ -699,12 +691,44 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
-    cmd->execute();
-    // TODO: Add your implementation here
-    // for example:
-    // Command* cmd = CreateCommand(cmd_line);
-    // cmd->execute();
-    // Please note that you must fork smash process for some commands (e.g., external commands....)
+
+    if(!cmd) return;
+
+    //TODO: clear finished jobs
+    jobList->removeFinishedJobs();
+
+    pid_t pid = fork();
+
+    if(pid == -1) {
+        perror("smash error: fork failed");
+        //TODO: return?
+    }
+
+    if(pid == 0){ //Child
+        setpgrp();
+        cmd->execute();
+        delete cmd;
+        exit(0);
+
+    } else { //Parent
+
+        //TODO: add job
+        int addedChildJobId = jobList->addJob(cmd, pid, false);//isStopped=false
+        bool res = cmd->takesCPU();
+        if(res){
+            waitpid(pid,NULL,WUNTRACED);
+            //remove
+            jobList->removeJobById(addedChildJobId);
+        } else {
+            //TODO: clear finished jobs
+            jobList->removeFinishedJobs();
+        }
+        delete cmd;
+        
+    }
+
+    
+
 }
 
 string SmallShell::getPrompt() const { return prompt;}

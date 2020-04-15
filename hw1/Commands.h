@@ -16,6 +16,7 @@ class Command {
 private:
     string cmd;
     bool takes_cpu;
+    bool exeternal = false;
  public:
   Command(const char* cmd_line, bool takesCPU);
   virtual ~Command() = default;
@@ -115,27 +116,6 @@ class QuitCommand : public BuiltInCommand {
   void execute() override;
 };
 
-class CommandsHistory {
- protected:
-  class CommandHistoryEntry {
-	  // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  CommandsHistory();
-  ~CommandsHistory() {}
-  void addRecord(const char* cmd_line);
-  void printHistory();
-};
-
-class HistoryCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
-  HistoryCommand(const char* cmd_line, CommandsHistory* history);
-  virtual ~HistoryCommand() {}
-  void execute() override;
-};
-
 class JobsList {
 public:
     class JobEntry {
@@ -172,7 +152,7 @@ private:
 public:
     JobsList();
     ~JobsList();
-    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
+    int addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -241,6 +221,7 @@ class SmallShell {
   // TODO: Add your data members
   string prompt;
   string lastWD;
+  JobsList* jobList;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
