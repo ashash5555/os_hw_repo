@@ -298,6 +298,7 @@ void JobsList::updateJobsCount() {
 }
 
 const int JobsList::getJobsCount() const { return jobsCount;}
+int JobsList::getTotalJobs() const {return jobs.size();}
 ///==================================================================================================================///
 
 
@@ -576,6 +577,99 @@ void KillCommand::execute() {
         string msg = "signal number " + sigStr + "was sent to pid " + pidStr;
         cout << msg << endl;
     }
+}
+///==================================================================================================================///
+
+
+
+///BackgroundCommand///
+///==================================================================================================================///
+
+BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
+        BuiltInCommand(cmd.c_str(), takes_cpu), jobID(-1), jobToStopID(-1), jobs(jobs) {
+    stringstream strStm(args[1]);
+    strStm >> jobID;
+    if(numOfArgs > 2 || !isdigit(jobID)) {
+        perror("smash error: bg: invalid arguments");
+        return;
+    }
+
+    JobsList::JobEntry* job = jobs->getJobById(jobID);
+    if(!job) {
+        cout << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
+        return;
+    }
+
+    bool isStopped = job->isJobStopped();
+    if(!isStopped) {
+        cout << "smash error: bg: job-id " << jobID <<" is already running in the background" << endl;
+        return;
+    }
+
+    this->jobToStopID = jobID;
+    this->jobToStop = job;
+
+    int foundStoppedID;
+    JobsList::JobEntry* foundStoppedJob  = jobs->getLastStoppedJob(&foundStoppedID);
+    if(numOfArgs == 1){
+        if(!foundStoppedJob) {
+            cout << "smash error: bg: there is no stopped jobs to resume" << endl;
+            return;
+        } else { //using bg without arguments
+            this->jobToStopID = foundStoppedID;
+            this->jobToStop = foundStoppedJob;
+        }
+    }
+
+}
+
+void BackgroundCommand::execute() {
+
+    //no execution if command was bad
+    if(jobToStopID <= 0) {return;}
+
+    string cmd = jobToStop->getJobCmd();
+    int pidToCont;
+    pidToCont = jobToStop->getJobPID();
+    cout << cmd << " : " << pidToCont << endl;
+
+
+
+    int res = kill(pidToCont, SIGCONT);
+    if(res != 0) {
+        perror("smash error: kill failed");
+    } else {
+        //manage JobsList
+        jobToStop->resumeJob();
+    }
+
+}
+///==================================================================================================================///
+
+
+                                                ///QuitCommand///
+///==================================================================================================================///
+
+QuitCommand::QuitCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
+        BuiltInCommand(cmd.c_str(), takes_cpu), jobs(jobs), isKilling(false)
+{
+    string killArg = "kill";
+    if(killArg == args[1]) { // delete all working or stopped jobs
+        isKilling = true;
+    }
+    //otherwise ignore all else
+}
+
+void QuitCommand::execute() {
+
+    if(!isKilling) return;
+
+    jobs->removeFinishedJobs(); //removing for correct vector size => total jobs to kill
+
+    int numKillsToDo = jobs->getTotalJobs();
+    cout << "smash: sending SIGKILL to " << numKillsToDo << " jobs:" << endl;
+
+    jobs->killAllJobs(); //printing done inside + kills. The messacare!
 }
 ///==================================================================================================================///
 
