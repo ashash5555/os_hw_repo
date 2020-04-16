@@ -43,8 +43,11 @@ class ExternalCommand : public Command {
 
 class PipeCommand : public Command {
   // TODO: Add your data members
+  string firstCmd;
+  string secondCmd;
+  bool redirectStdOut;
  public:
-  PipeCommand(const char* cmd_line);
+  PipeCommand(const char* cmd_line, bool takes_cpu);
   virtual ~PipeCommand() {}
   void execute() override;
 };
