@@ -35,8 +35,6 @@ class BuiltInCommand : public Command {
 };
 
 class ExternalCommand : public Command {
- private:
-  vector<char*> bashArgs;
  public:
   ExternalCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu);
   virtual ~ExternalCommand() {}
@@ -103,7 +101,7 @@ class GetCurrDirCommand : public BuiltInCommand {
 class ShowPidCommand : public BuiltInCommand {
  public:
   ShowPidCommand(const string cmd, bool takes_cpu=false);
-  virtual ~ShowPidCommand() {}
+  virtual ~ShowPidCommand() = default;
   void execute() override;
 };
 
@@ -111,13 +109,34 @@ class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
 private:
-  JobsList* jobs;
-  bool isKilling;
+    JobsList* jobs;
+    bool isKilling;
 public:
-  QuitCommand(const string cmd, char** args, int numOfStrings, bool takes_cpu, JobsList* jobs);
-  virtual ~QuitCommand() {}
-  void execute() override;
+    QuitCommand(const string cmd, char** args, int numOfStrings, bool takes_cpu, JobsList* jobs);
+    virtual ~QuitCommand() {}
+    void execute() override;
 };
+
+//class CommandsHistory {
+// protected:
+//  class CommandHistoryEntry {
+//	  // TODO: Add your data members
+//  };
+// // TODO: Add your data members
+// public:
+//  CommandsHistory();
+//  ~CommandsHistory() {}
+//  void addRecord(const char* cmd_line);
+//  void printHistory();
+//};
+//
+//class HistoryCommand : public BuiltInCommand {
+// // TODO: Add your data members
+// public:
+//  HistoryCommand(const char* cmd_line, CommandsHistory* history);
+//  virtual ~HistoryCommand() {}
+//  void execute() override;
+//};
 
 class JobsList {
 public:
@@ -155,7 +174,7 @@ private:
 public:
     JobsList();
     ~JobsList();
-    int addJob(Command* cmd, pid_t pid, bool isStopped = false);
+    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -173,31 +192,35 @@ ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- private:	
-    JobsList* jobs;	
- public:	
-  JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);	
+private:
+    JobsList* jobs;
+public:
+  JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);
   virtual ~JobsCommand() = default;
   void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
- 	private:	
-    int signal;	
-    int jobID;	
-    pid_t jobPID;	
-    JobsList* jobs;	
-  public:	
-    KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);	
-    virtual ~KillCommand() = default;
-    void execute() override;
+private:
+    int signal;
+    int jobID;
+    pid_t jobPID;
+    JobsList* jobs;
+
+public:
+  KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);
+  virtual ~KillCommand() = default;
+  void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
+private:
+    int jobID;
+    JobsList* jobs;
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
