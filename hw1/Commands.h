@@ -43,8 +43,11 @@ class ExternalCommand : public Command {
 
 class PipeCommand : public Command {
   // TODO: Add your data members
+  string firstCmd;
+  string secondCmd;
+  bool redirectStdOut;
  public:
-  PipeCommand(const char* cmd_line);
+  PipeCommand(const char* cmd_line, bool takes_cpu);
   virtual ~PipeCommand() {}
   void execute() override;
 };
@@ -253,7 +256,65 @@ public:
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
 
+//timeout x a
+//to child: sleep x -> sigalarm to parent
+//parent : add a to timesList -> start a as usual
+//signal handler: compare durations and kill all that need to be killed
+class TimeoutCommand;
+class TimeoutEntry {
+private:
+    string cmd;
+    pid_t pid;
+    time_t start;
+    int duration;
 
+public:
+    TimeoutEntry(const string cmd_line, pid_t pid, int duration) :
+            cmd(cmd_line), pid(pid), start(time(nullptr)), duration(duration){}
+    ~TimeoutEntry() = default;
+    string getCmd() const { return cmd;}
+    pid_t getPID() const { return pid;}
+    int getDuration() const { return duration;}
+    time_t getTimeLeft() const {
+        time_t current = time(nullptr);
+        int timeElapsed = difftime(current, start) + 0.5;
+        return duration - timeElapsed;
+    }
+
+    bool operator<(const TimeoutEntry& e) const {
+        int timeLeft1 = this->getTimeLeft();
+        int timeLeft2 = e.getTimeLeft();
+        return timeLeft1 < timeLeft2;
+    }
+};
+
+/// move those implementations to cpp...
+class TimeoutCommand : public BuiltInCommand {
+private:
+    string cmdToRun;
+    pid_t pid;
+    time_t start;
+    int duration;
+
+public:
+    TimeoutCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
+    ~TimeoutCommand() = default;
+//    pid_t getPID() const { return pid;}
+    int getDuration() const { return duration;}
+    const char* getCmdToRun() const { return cmdToRun.c_str();}
+//    void setPID(pid_t pid) {this->pid = pid;}
+    time_t getTimeLeft() const {
+        time_t current = time(nullptr);
+        int timeElapsed = difftime(current, start) + 0.5;
+        return duration - timeElapsed;
+    }
+    void execute();
+};
+
+class comparePtrs {
+public:
+    bool operator()(TimeoutEntry* e1, TimeoutEntry* e2) {return *e1 < *e2;}
+};
 
 class SmallShell {
  private:
@@ -261,6 +322,7 @@ class SmallShell {
   string prompt;
   string lastWD;
   JobsList* jobList;
+  vector<TimeoutEntry*> timedList;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -279,6 +341,10 @@ class SmallShell {
   void setLastWD(string path);
   string getLastWD() const;
   // TODO: add extra methods as needed
+  void addTimedCommand(const string cmd, pid_t pid, int duration);
+  int getMinTimeLeft();
+  TimeoutEntry* getEntryToKill();
+  bool isTimedEmpty() const;
 };
 
 #endif //SMASH_COMMAND_H_
