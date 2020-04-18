@@ -8,12 +8,40 @@ using namespace std;
 
 void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
-	cout << "smash: got ctrl-z" << endl;
-
+	cout << "smash: got ctrl-Z" << endl;
+    SmallShell& smash = SmallShell::getInstance();
+    JobsList::JobEntry* job = smash.getCurrentJob();
+    int res;
+    if (job) {
+        pid_t pid = job->getJobPID();
+        res = kill(pid, SIGSTOP);
+        if (res != 0) {
+            perror("smash error: kill failed");
+            return;
+        }
+        smash.addSleepingJob(job);
+    }
 }
 
 void ctrlCHandler(int sig_num) {
   // TODO: Add your implementation
+    cout << "smash: got ctrl-C" << endl;
+    SmallShell& smash = SmallShell::getInstance();
+    JobsList::JobEntry* job = smash.getCurrentJob();
+    int res;
+    if (job) {
+        pid_t pid = job->getJobPID();
+        res = kill(pid, SIGKILL);
+        if (res != 0) {
+            perror("smash error: kill failed");
+            return;
+        }
+        int jobID = job->getJobID();
+        bool jobInList = smash.jobInList(jobID);
+        bool deleteEntry = (jobID != -1 && !jobInList);
+        smash.clearCurrentJob(deleteEntry);
+        cout << "smash: process " << pid << " was killed" << endl;
+    }
 }
 
 void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
@@ -32,6 +60,7 @@ void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
         }
     }
     else {
+        /// if we got here there is a problem
         res = kill(pid, SIGSTOP);
         if (res != 0) {
             perror("smash error: kill failed");

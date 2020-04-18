@@ -256,10 +256,7 @@ public:
 // TODO: add more classes if needed 
 // maybe chprompt , timeout ?
 
-//timeout x a
-//to child: sleep x -> sigalarm to parent
-//parent : add a to timesList -> start a as usual
-//signal handler: compare durations and kill all that need to be killed
+
 class TimeoutCommand;
 class TimeoutEntry {
 private:
@@ -269,17 +266,11 @@ private:
     int duration;
 
 public:
-    TimeoutEntry(const string cmd_line, pid_t pid, int duration) :
-            cmd(cmd_line), pid(pid), start(time(nullptr)), duration(duration){}
+    TimeoutEntry(const string cmd_line, pid_t pid, int duration);
     ~TimeoutEntry() = default;
-    string getCmd() const { return cmd;}
-    pid_t getPID() const { return pid;}
-    int getDuration() const { return duration;}
-    time_t getTimeLeft() const {
-        time_t current = time(nullptr);
-        int timeElapsed = difftime(current, start) + 0.5;
-        return duration - timeElapsed;
-    }
+    string getCmd() const;
+    pid_t getPID() const;
+    time_t getTimeLeft() const;
 
     bool operator<(const TimeoutEntry& e) const {
         int timeLeft1 = this->getTimeLeft();
@@ -288,26 +279,19 @@ public:
     }
 };
 
-/// move those implementations to cpp...
+
 class TimeoutCommand : public BuiltInCommand {
 private:
     string cmdToRun;
-    pid_t pid;
     time_t start;
     int duration;
 
 public:
     TimeoutCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
     ~TimeoutCommand() = default;
-//    pid_t getPID() const { return pid;}
-    int getDuration() const { return duration;}
-    const char* getCmdToRun() const { return cmdToRun.c_str();}
-//    void setPID(pid_t pid) {this->pid = pid;}
-    time_t getTimeLeft() const {
-        time_t current = time(nullptr);
-        int timeElapsed = difftime(current, start) + 0.5;
-        return duration - timeElapsed;
-    }
+
+    int getDuration() const;
+    const char* getCmdToRun() const;
     void execute();
 };
 
@@ -323,6 +307,7 @@ class SmallShell {
   string lastWD;
   JobsList* jobList;
   vector<TimeoutEntry*> timedList;
+  JobsList::JobEntry* currentJob;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -344,7 +329,12 @@ class SmallShell {
   void addTimedCommand(const string cmd, pid_t pid, int duration);
   int getMinTimeLeft();
   TimeoutEntry* getEntryToKill();
+  JobsList::JobEntry* getCurrentJob();
   bool isTimedEmpty() const;
+  void updateCurrentJob(JobsList::JobEntry* job);
+  void clearCurrentJob(bool deleteEntry);
+  bool jobInList(int jobId) const;
+  void addSleepingJob(JobsList::JobEntry* job);
 };
 
 #endif //SMASH_COMMAND_H_
