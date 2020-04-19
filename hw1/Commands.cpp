@@ -337,19 +337,23 @@ void GetCurrDirCommand::execute() {
 
     /// If any arguments were provided they will be ignored
 
-    char *buff = nullptr;
-    size_t bufSize = 0;
-    string path;
-    char *res = nullptr;
-    res = getcwd(buff, bufSize);
-    path = res;
+//    char *buff = nullptr;
+//    size_t bufSize = 0;
+//    string path;
+//    char *res = nullptr;
+//    res = getcwd(buff, bufSize);
+//    path = res;
+
+    char* res = get_current_dir_name();
+    string path = res;
 
     if(!res){
         perror("smash error: getcwd failed");
     }else {
         cout << path << endl;
     }
-    free(buff);
+//    free(buff);
+    free(res);
 }
 ///==================================================================================================================///
 
@@ -358,11 +362,12 @@ void GetCurrDirCommand::execute() {
 ShowPidCommand::ShowPidCommand(const string cmd, bool takes_cpu) : BuiltInCommand(cmd.c_str(), takes_cpu) {}
 
 void ShowPidCommand::execute() {
-    //SmallShell& smash = SmallShell::getInstance();
+    SmallShell& smash = SmallShell::getInstance();
 
     /// If any arguments were provided they will be ignored
     ///TODO: Check for errors from getpid system call
-    int shellPID = getpid();
+//    int shellPID = getpid();
+    pid_t shellPID = smash.getSmashPid();
     if (shellPID < 0) {
         perror("smash error: getpid failed");
     }
@@ -380,11 +385,15 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
     SmallShell& smash = SmallShell::getInstance();
 
     ///TODO: What happens if getcwd system call fails? What error do we return?
-    char *buf = nullptr;
-    size_t bufSize = 0;
-    string path;
-    path = getcwd(buf, bufSize);
-    currentWD = path;
+
+    /// a buffer without size was sent to getcwd() which realloc space in memory without knowing the size what caused
+    /// a memory leak. changed to get_current_dir_name() which malloc space im memory in the exact size of the path.
+//    char *buf = nullptr;
+//    size_t bufSize = 0;
+//    string path;
+//    path = getcwd(buf, bufSize);
+    char* res = get_current_dir_name();
+    currentWD = res;
 
     string lastWDCallBack = "-";
     string lastWD = smash.getLastWD();
@@ -409,7 +418,8 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
     else{
         newWD = args[1];
     }
-    free(buf);
+//    free(buf);
+    free(res);
 }
 
 void ChangeDirCommand::execute() {
@@ -523,6 +533,7 @@ void CopyCommand::execute() {
     if (res_src != 0 || res_dest != 0) {
         perror("smash error: close failed");
     }
+    cout << "smash: " << src << " was copied to " << dest << endl;
 }
 ///==================================================================================================================///
 
@@ -802,63 +813,63 @@ void PipeCommand::execute() {
     SmallShell &smash = SmallShell::getInstance();
     int myPipe[2];
     pipe(myPipe);
-    int saved_fd;
-    if (redirectStdOut) saved_fd = dup(1);
-    else saved_fd = dup(2);
-
-    pid_t pid = fork();
-    if (pid < 0) {
-        perror("smash error: fork failed");
-    }
-    else if (pid == 0) {
-        setpgrp();
-        close(myPipe[1]);
-        dup2(myPipe[0], 0);
-        close(myPipe[0]);
-        smash.executeCommand((this->secondCmd).c_str());
-        exit(0);
-    }
-    else {
-        close(myPipe[0]);
-        if (redirectStdOut) dup2(myPipe[1], 1);
-        else dup2(myPipe[1], 2);
-        close(myPipe[1]);
-        smash.executeCommand((this->firstCmd).c_str());
-        if (redirectStdOut) dup2(saved_fd, 1);
-        else dup2(saved_fd, 2);
-        close(saved_fd);
-
-        waitpid(pid, NULL, WUNTRACED);
-    }
-
-//    pid_t pidFirst = fork();
-//    if (pidFirst < 0) {
+//    int saved_fd;
+//    if (redirectStdOut) saved_fd = dup(1);
+//    else saved_fd = dup(2);
+//
+//    pid_t pid = fork();
+//    if (pid < 0) {
 //        perror("smash error: fork failed");
-//    } else if (pidFirst == 0) {     /// first child - runs first command
+//    }
+//    else if (pid == 0) {
 //        setpgrp();
+//        close(myPipe[1]);
+//        dup2(myPipe[0], 0);
 //        close(myPipe[0]);
-//        if (redirectStdOut) dup2(myPipe[1], 1);     /// stdout of the first command -> pipe write channel
-//        else dup2(myPipe[1], 2);     /// stderr of the first command -> pipe write channel
+//        smash.executeCommand((this->secondCmd).c_str());
+//        exit(0);
+//    }
+//    else {
+//        close(myPipe[0]);
+//        if (redirectStdOut) dup2(myPipe[1], 1);
+//        else dup2(myPipe[1], 2);
 //        close(myPipe[1]);
 //        smash.executeCommand((this->firstCmd).c_str());
-//        exit(0);
-//    } else {      /// father
-//        pid_t pidSecond = fork();
-//        if (pidSecond < 0) {
-//            perror("smash error: fork failed");
-//        } else if (pidSecond == 0) {     /// second child - runs second command
-//            setpgrp();
-//            close(myPipe[1]);
-//            dup2(myPipe[0], 0);     /// stdin of second command -> pipe read channel
-//            close(myPipe[0]);
-//            smash.executeCommand((this->secondCmd).c_str());
-//            exit(0);
-//        } else {      /// father
-//            close(myPipe[0]);
-//            close(myPipe[1]);
-//            while (wait(NULL) > 0) {}
-//        }
+//        if (redirectStdOut) dup2(saved_fd, 1);
+//        else dup2(saved_fd, 2);
+//        close(saved_fd);
+//
+//        waitpid(pid, NULL, WUNTRACED);
 //    }
+
+    pid_t pidFirst = fork();
+    if (pidFirst < 0) {
+        perror("smash error: fork failed");
+    } else if (pidFirst == 0) {     /// first child - runs first command
+        setpgrp();
+        close(myPipe[0]);
+        if (redirectStdOut) dup2(myPipe[1], 1);     /// stdout of the first command -> pipe write channel
+        else dup2(myPipe[1], 2);     /// stderr of the first command -> pipe write channel
+        close(myPipe[1]);
+        smash.executeCommand((this->firstCmd).c_str());
+        exit(0);
+    } else {      /// father
+        pid_t pidSecond = fork();
+        if (pidSecond < 0) {
+            perror("smash error: fork failed");
+        } else if (pidSecond == 0) {     /// second child - runs second command
+            setpgrp();
+            close(myPipe[1]);
+            dup2(myPipe[0], 0);     /// stdin of second command -> pipe read channel
+            close(myPipe[0]);
+            smash.executeCommand((this->secondCmd).c_str());
+            exit(0);
+        } else {      /// father
+            close(myPipe[0]);
+            close(myPipe[1]);
+            while (wait(NULL) > 0) {}
+        }
+    }
 }
 ///==================================================================================================================///
 
@@ -943,7 +954,7 @@ const char * TimeoutCommand::getCmdToRun() const { return cmdToRun.c_str();}
 ///SmallShell///
 ///==================================================================================================================///
 SmallShell::SmallShell() : prompt("smash> "), lastWD(""), jobList(new JobsList()),
-                                                               timedList(vector<TimeoutEntry*>()), currentJob(nullptr) {
+                                           timedList(vector<TimeoutEntry*>()), currentJob(nullptr), smashPID(getpid()) {
 // TODO: add your implementation
 }
 
@@ -975,6 +986,15 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     bool takes_cpu = !_isBackgroundComamnd(cmd_line);
     char** args = new char*[COMMAND_MAX_ARGS];
     int numOfArgs = _parseCommandLine(cmd_line, args);
+    /// this is a fix for args when getting commands like 'sleep 10&' args = ['sleep', '10&'] so changed to args = ['sleep', '10', '&']
+    string lastArg = args[numOfArgs-1];
+    if (lastArg.find("&") == lastArg.length()-1 && lastArg.length() > 1) {
+        string ampersand = lastArg.substr(lastArg.length()-1);
+        string arg = lastArg.substr(0, lastArg.length()-1);
+        string endOfCmd = arg + " " + ampersand;
+        _parseCommandLine(endOfCmd.c_str(), args+numOfArgs-1);
+        numOfArgs++;
+    }
 
     /// remove the background sign if needed
     char* cmdChar = new char[cmdStr.length() + 1];
@@ -1174,4 +1194,5 @@ void SmallShell::addSleepingJob(JobsList::JobEntry *job) {
         jobList->addJob(cmd, pid, true);
     }
 }
+pid_t SmallShell::getSmashPid() const { return smashPID;}
 ///==================================================================================================================///

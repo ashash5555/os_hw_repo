@@ -308,6 +308,7 @@ class SmallShell {
   JobsList* jobList;
   vector<TimeoutEntry*> timedList;
   JobsList::JobEntry* currentJob;
+  pid_t smashPID;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -320,6 +321,7 @@ class SmallShell {
     return instance;
   }
   ~SmallShell();
+  pid_t getSmashPid() const;
   void executeCommand(const char* cmd_line);
   void setPrompt(string newPrompt);
   string getPrompt() const;
