@@ -19,6 +19,7 @@ void ctrlZHandler(int sig_num) {
             perror("smash error: kill failed");
             return;
         }
+        cout << "smash: process " << pid <<  " was stopped" << endl;
         smash.addSleepingJob(job);
     }
 }
@@ -40,6 +41,7 @@ void ctrlCHandler(int sig_num) {
         bool jobInList = smash.jobInList(jobID);
         bool deleteEntry = (jobID != -1 && !jobInList);
         smash.clearCurrentJob(deleteEntry);
+
         cout << "smash: process " << pid << " was killed" << endl;
     }
 }

@@ -184,8 +184,12 @@ void JobsList::killAllJobs() {
         if (*it) {
             pid_t pid = (*it)->getJobPID();
             string cmd = (*it)->getJobCmd();
-            cout << pid << " : " <<  cmd << endl;
-            kill(pid, SIGKILL);
+            int res = kill(pid, SIGKILL);
+            if (res != 0) {
+                perror("smash error: kill: invalid arguments");
+            } else {
+                cout << pid << " : " <<  cmd << endl;
+            }
             delete *it;
             *it = nullptr;
             it = jobs.erase(it);
@@ -308,7 +312,9 @@ int JobsList::getTotalJobs() const {return jobs.size();}
 ChpromptCommand::ChpromptCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
         BuiltInCommand(cmd.c_str(), takes_cpu), new_prompt("") {
     SmallShell& smash = SmallShell::getInstance();
-
+    if (!args) {
+        perror("smash error: chprompt: invalid arguments");
+    }
     /// args = [arg1='chprompt', arg2, arg3, ..., argn, NULL]
     if (numOfArgs == 1) new_prompt = "smash> ";
     else if (numOfArgs > 2) {
@@ -337,13 +343,6 @@ void GetCurrDirCommand::execute() {
 
     /// If any arguments were provided they will be ignored
 
-//    char *buff = nullptr;
-//    size_t bufSize = 0;
-//    string path;
-//    char *res = nullptr;
-//    res = getcwd(buff, bufSize);
-//    path = res;
-
     char* res = get_current_dir_name();
     string path = res;
 
@@ -352,7 +351,7 @@ void GetCurrDirCommand::execute() {
     }else {
         cout << path << endl;
     }
-//    free(buff);
+
     free(res);
 }
 ///==================================================================================================================///
@@ -366,14 +365,13 @@ void ShowPidCommand::execute() {
 
     /// If any arguments were provided they will be ignored
     ///TODO: Check for errors from getpid system call
-//    int shellPID = getpid();
+
     pid_t shellPID = smash.getSmashPid();
     if (shellPID < 0) {
         perror("smash error: getpid failed");
     }
 
     cout << "smash pid is " << shellPID << endl;
-
 }
 ///==================================================================================================================///
 
@@ -382,16 +380,13 @@ void ShowPidCommand::execute() {
 ///==================================================================================================================///
 ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs, bool takes_cpu) :
         BuiltInCommand(cmd.c_str(), takes_cpu), newWD(""), currentWD("") {
+
+    if (!args) {
+        perror("smash error: cd: invalid arguments");
+    }
+
     SmallShell& smash = SmallShell::getInstance();
 
-    ///TODO: What happens if getcwd system call fails? What error do we return?
-
-    /// a buffer without size was sent to getcwd() which realloc space in memory without knowing the size what caused
-    /// a memory leak. changed to get_current_dir_name() which malloc space im memory in the exact size of the path.
-//    char *buf = nullptr;
-//    size_t bufSize = 0;
-//    string path;
-//    path = getcwd(buf, bufSize);
     char* res = get_current_dir_name();
     currentWD = res;
 
@@ -418,7 +413,7 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
     else{
         newWD = args[1];
     }
-//    free(buf);
+
     free(res);
 }
 
@@ -448,6 +443,10 @@ void ChangeDirCommand::execute() {
 ///==================================================================================================================///
 CopyCommand::CopyCommand(const char *cmd_line, char **args, int numOfArgs, bool takes_cpu) :
         BuiltInCommand(cmd_line, takes_cpu), src(""), dest("") {
+    if (!args) {
+        perror("smash error: cp: invalid arguments");
+    }
+
     if (numOfArgs > 3) {
         perror("smash error: too many arguments");      /// change?
     } else {
@@ -568,9 +567,8 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
     string inputNum =  args[1];
     inputNum = inputNum.substr(1);
     stringstream sigStr(inputNum);
+    if (!isInt(inputNum) || !isInt(args[2])) perror("smash error: kill: invalid arguments");
     sigStr >> this->signal;
-    //stringstream sigStr(args[1]);
-    //sigStr >> dash >> this->signal;
     stringstream jobIdStr(args[2]);
     jobIdStr >> this->jobID;
     if (dash != '-' || signal <= 0 || jobID <= 0) {    /// change this condition to check the string!
@@ -642,7 +640,7 @@ void ForegroundCommand::execute() {
         job = jobs->getJobById(jobID);
         if (!job) {
             string jobIdStr = to_string(jobID);
-            string errMsg = "smash error: kill: job-id " + jobIdStr + "does not exist";
+            string errMsg = "smash error: fg: job-id " + jobIdStr + "does not exist";
             perror(errMsg.c_str());
         }
     } else {        /// jobID == -1
@@ -987,14 +985,14 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     char** args = new char*[COMMAND_MAX_ARGS];
     int numOfArgs = _parseCommandLine(cmd_line, args);
     /// this is a fix for args when getting commands like 'sleep 10&' args = ['sleep', '10&'] so changed to args = ['sleep', '10', '&']
-    string lastArg = args[numOfArgs-1];
-    if (lastArg.find("&") == lastArg.length()-1 && lastArg.length() > 1) {
-        string ampersand = lastArg.substr(lastArg.length()-1);
-        string arg = lastArg.substr(0, lastArg.length()-1);
-        string endOfCmd = arg + " " + ampersand;
-        _parseCommandLine(endOfCmd.c_str(), args+numOfArgs-1);
-        numOfArgs++;
-    }
+//    string lastArg = args[numOfArgs-1];
+//    if (lastArg.find("&") == lastArg.length()-1 && lastArg.length() > 1) {
+//        string ampersand = lastArg.substr(lastArg.length()-1);
+//        string arg = lastArg.substr(0, lastArg.length()-1);
+//        string endOfCmd = arg + " " + ampersand;
+//        _parseCommandLine(endOfCmd.c_str(), args+numOfArgs-1);
+//        numOfArgs++;
+//    }
 
     /// remove the background sign if needed
     char* cmdChar = new char[cmdStr.length() + 1];
