@@ -43,16 +43,23 @@ class ExternalCommand : public Command {
 
 class PipeCommand : public Command {
   // TODO: Add your data members
+  string firstCmd;
+  string secondCmd;
+  bool redirectStdOut;
  public:
-  PipeCommand(const char* cmd_line);
+  PipeCommand(const char* cmd_line, bool takes_cpu);
   virtual ~PipeCommand() {}
   void execute() override;
 };
 
 class RedirectionCommand : public Command {
  // TODO: Add your data members
+ private:
+  string innerCmd;
+  string file;
+  bool isOverWrite;
  public:
-  explicit RedirectionCommand(const char* cmd_line);
+  RedirectionCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu, bool isOverWrite);
   virtual ~RedirectionCommand() {}
   void execute() override;
   //void prepare() override;
@@ -187,6 +194,7 @@ public:
     const int getJobsCount() const;
     void updateJobsCount();
     int getTotalJobs() const;
+    void killThisFucker(int jobId);
 };
 ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
@@ -254,6 +262,48 @@ public:
 // maybe chprompt , timeout ?
 
 
+class TimeoutCommand;
+class TimeoutEntry {
+private:
+    string cmd;
+    pid_t pid;
+    time_t start;
+    int duration;
+
+public:
+    TimeoutEntry(const string cmd_line, pid_t pid, int duration);
+    ~TimeoutEntry() = default;
+    string getCmd() const;
+    pid_t getPID() const;
+    time_t getTimeLeft() const;
+
+    bool operator<(const TimeoutEntry& e) const {
+        int timeLeft1 = this->getTimeLeft();
+        int timeLeft2 = e.getTimeLeft();
+        return timeLeft1 < timeLeft2;
+    }
+};
+
+
+class TimeoutCommand : public BuiltInCommand {
+private:
+    string cmdToRun;
+    time_t start;
+    int duration;
+
+public:
+    TimeoutCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
+    ~TimeoutCommand() = default;
+
+    int getDuration() const;
+    const char* getCmdToRun() const;
+    void execute();
+};
+
+class comparePtrs {
+public:
+    bool operator()(TimeoutEntry* e1, TimeoutEntry* e2) {return *e1 < *e2;}
+};
 
 class SmallShell {
  private:
@@ -261,6 +311,9 @@ class SmallShell {
   string prompt;
   string lastWD;
   JobsList* jobList;
+  vector<TimeoutEntry*> timedList;
+  JobsList::JobEntry* currentJob;
+  pid_t smashPID;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
@@ -273,12 +326,22 @@ class SmallShell {
     return instance;
   }
   ~SmallShell();
+  pid_t getSmashPid() const;
   void executeCommand(const char* cmd_line);
   void setPrompt(string newPrompt);
   string getPrompt() const;
   void setLastWD(string path);
   string getLastWD() const;
   // TODO: add extra methods as needed
+  void addTimedCommand(const string cmd, pid_t pid, int duration);
+  int getMinTimeLeft();
+  TimeoutEntry* getEntryToKill();
+  JobsList::JobEntry* getCurrentJob();
+  bool isTimedEmpty() const;
+  void updateCurrentJob(JobsList::JobEntry* job);
+  void clearCurrentJob(bool deleteEntry);
+  bool jobInList(int jobId) const;
+  void addSleepingJob(JobsList::JobEntry* job);
 };
 
 #endif //SMASH_COMMAND_H_
