@@ -16,50 +16,50 @@ class Command {
 private:
     string cmd;
     bool takes_cpu;
- public:
-  Command(const char* cmd_line, bool takesCPU);
-  virtual ~Command() = default;
-  virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
-  // TODO: Add your extra methods if needed
+public:
+    Command(const char* cmd_line, bool takesCPU);
+    virtual ~Command() = default;
+    virtual void execute() = 0;
+    //virtual void prepare();
+    //virtual void cleanup();
+    // TODO: Add your extra methods if needed
 
-  const char* getCommand() const;
-  bool takesCPU() const;
+    const char* getCommand() const;
+    bool takesCPU() const;
 };
 
 class BuiltInCommand : public Command {
- public:
-  BuiltInCommand(const char* cmd_line, bool takesCPU);
-  virtual ~BuiltInCommand() {}
+public:
+    BuiltInCommand(const char* cmd_line, bool takesCPU);
+    virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
- public:
-  ExternalCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu);
-  virtual ~ExternalCommand() {}
-  void execute() override;
+public:
+    ExternalCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu);
+    virtual ~ExternalCommand() {}
+    void execute() override;
 };
 
 class PipeCommand : public Command {
-  // TODO: Add your data members
-  string firstCmd;
-  string secondCmd;
-  bool redirectStdOut;
- public:
-  PipeCommand(const char* cmd_line, bool takes_cpu);
-  virtual ~PipeCommand() {}
-  void execute() override;
+    // TODO: Add your data members
+    string firstCmd;
+    string secondCmd;
+    bool redirectStdOut;
+public:
+    PipeCommand(const char* cmd_line, bool takes_cpu);
+    virtual ~PipeCommand() {}
+    void execute() override;
 };
 
 class RedirectionCommand : public Command {
- // TODO: Add your data members
- public:
-  explicit RedirectionCommand(const char* cmd_line);
-  virtual ~RedirectionCommand() {}
-  void execute() override;
-  //void prepare() override;
-  //void cleanup() override;
+    // TODO: Add your data members
+public:
+    explicit RedirectionCommand(const char* cmd_line);
+    virtual ~RedirectionCommand() {}
+    void execute() override;
+    //void prepare() override;
+    //void cleanup() override;
 };
 
 class ChpromptCommand : public BuiltInCommand {
@@ -78,34 +78,34 @@ public:
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
 private:
-  string newWD;
-  string currentWD;
+    string newWD;
+    string currentWD;
 public:
-  ChangeDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
-  ChangeDirCommand(const ChangeDirCommand&) = default;
-  ChangeDirCommand&operator=(const ChangeDirCommand&) = default;
-  virtual ~ChangeDirCommand() {}
+    ChangeDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
+    ChangeDirCommand(const ChangeDirCommand&) = default;
+    ChangeDirCommand&operator=(const ChangeDirCommand&) = default;
+    virtual ~ChangeDirCommand() {}
 
-  void execute() override;
+    void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
- private:
-  /// No private fields as of yet
- public:
-  GetCurrDirCommand(const string cmd, bool takes_cpu=false);
-  virtual ~GetCurrDirCommand() {}
-  GetCurrDirCommand(const GetCurrDirCommand&) = default;
-  GetCurrDirCommand&operator=(const GetCurrDirCommand&) = default;
+private:
+    /// No private fields as of yet
+public:
+    GetCurrDirCommand(const string cmd, bool takes_cpu=false);
+    virtual ~GetCurrDirCommand() {}
+    GetCurrDirCommand(const GetCurrDirCommand&) = default;
+    GetCurrDirCommand&operator=(const GetCurrDirCommand&) = default;
 
-  void execute() override;
+    void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
- public:
-  ShowPidCommand(const string cmd, bool takes_cpu=false);
-  virtual ~ShowPidCommand() = default;
-  void execute() override;
+public:
+    ShowPidCommand(const string cmd, bool takes_cpu=false);
+    virtual ~ShowPidCommand() = default;
+    void execute() override;
 };
 
 class JobsList;
@@ -195,17 +195,17 @@ public:
 ostream&operator<<(ostream& os, const JobsList::JobEntry& jobEntry);
 
 class JobsCommand : public BuiltInCommand {
- // TODO: Add your data members
+    // TODO: Add your data members
 private:
     JobsList* jobs;
 public:
-  JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);
-  virtual ~JobsCommand() = default;
-  void execute() override;
+    JobsCommand(const char* cmd_line, JobsList* jobs, bool takes_cpu);
+    virtual ~JobsCommand() = default;
+    void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
- // TODO: Add your data members
+    // TODO: Add your data members
 private:
     int signal;
     int jobID;
@@ -213,33 +213,33 @@ private:
     JobsList* jobs;
 
 public:
-  KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);
-  virtual ~KillCommand() = default;
-  void execute() override;
+    KillCommand(const char* cmd_line, char** args, int numOfArgs, JobsList* jobs, bool takes_cpu);
+    virtual ~KillCommand() = default;
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+    // TODO: Add your data members
 private:
     int jobID;
     JobsList* jobs;
- public:
-  ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
-  virtual ~ForegroundCommand() {}
-  void execute() override;
+public:
+    ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
+    virtual ~ForegroundCommand() {}
+    void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
- private:
-  int jobID;
-  int jobToStopID;
-  JobsList* jobs;
-  JobsList::JobEntry* jobToStop;
- public:
-  BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs);
-  virtual ~BackgroundCommand() {}
-  void execute() override;
+    // TODO: Add your data members
+private:
+    int jobID;
+    int jobToStopID;
+    JobsList* jobs;
+    JobsList::JobEntry* jobToStop;
+public:
+    BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs);
+    virtual ~BackgroundCommand() {}
+    void execute() override;
 };
 
 
@@ -249,12 +249,12 @@ private:
     string src;
     string dest;
 public:
-  CopyCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
-  virtual ~CopyCommand() {}
-  void execute() override;
+    CopyCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu);
+    virtual ~CopyCommand() {}
+    void execute() override;
 };
 
-// TODO: add more classes if needed 
+// TODO: add more classes if needed
 // maybe chprompt , timeout ?
 
 
@@ -302,42 +302,44 @@ public:
 };
 
 class SmallShell {
- private:
-  // TODO: Add your data members
-  string prompt;
-  string lastWD;
-  JobsList* jobList;
-  vector<TimeoutEntry*> timedList;
-  JobsList::JobEntry* currentJob;
-  pid_t smashPID;
-  SmallShell();
- public:
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
-  {
-    static SmallShell instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
-    return instance;
-  }
-  ~SmallShell();
-  pid_t getSmashPid() const;
-  void executeCommand(const char* cmd_line);
-  void setPrompt(string newPrompt);
-  string getPrompt() const;
-  void setLastWD(string path);
-  string getLastWD() const;
-  // TODO: add extra methods as needed
-  void addTimedCommand(const string cmd, pid_t pid, int duration);
-  int getMinTimeLeft();
-  TimeoutEntry* getEntryToKill();
-  JobsList::JobEntry* getCurrentJob();
-  bool isTimedEmpty() const;
-  void updateCurrentJob(JobsList::JobEntry* job);
-  void clearCurrentJob(bool deleteEntry);
-  bool jobInList(int jobId) const;
-  void addSleepingJob(JobsList::JobEntry* job);
+private:
+    // TODO: Add your data members
+    string prompt;
+    string lastWD;
+    JobsList* jobList;
+    vector<TimeoutEntry*> timedList;
+    JobsList::JobEntry* currentJob;
+    pid_t smashPID;
+    bool fromPipe;
+    SmallShell();
+public:
+    Command *CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&)      = delete; // disable copy ctor
+    void operator=(SmallShell const&)  = delete; // disable = operator
+    static SmallShell& getInstance() // make SmallShell singleton
+    {
+        static SmallShell instance; // Guaranteed to be destroyed.
+        // Instantiated on first use.
+        return instance;
+    }
+    ~SmallShell();
+    pid_t getSmashPid() const;
+    void executeCommand(const char* cmd_line);
+    void setPrompt(string newPrompt);
+    string getPrompt() const;
+    void setLastWD(string path);
+    string getLastWD() const;
+    // TODO: add extra methods as needed
+    void addTimedCommand(const string cmd, pid_t pid, int duration);
+    int getMinTimeLeft();
+    TimeoutEntry* getEntryToKill();
+    JobsList::JobEntry* getCurrentJob();
+    bool isTimedEmpty() const;
+    void updateCurrentJob(JobsList::JobEntry* job);
+    void clearCurrentJob(bool deleteEntry);
+    bool jobInList(int jobId) const;
+    void addSleepingJob(JobsList::JobEntry* job);
+    void markFromPipe() {fromPipe = true;}
 };
 
 #endif //SMASH_COMMAND_H_

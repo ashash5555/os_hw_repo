@@ -7,14 +7,25 @@
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
-	// TODO: Add your implementation
-	cout << "smash: got ctrl-Z" << endl;
+    // TODO: Add your implementation
+    cout << "smash: got ctrl-Z" << endl;
     SmallShell& smash = SmallShell::getInstance();
+    pid_t smashPID = smash.getSmashPid();
     JobsList::JobEntry* job = smash.getCurrentJob();
-    int res;
+    int res = -1;
     if (job) {
         pid_t pid = job->getJobPID();
-        res = kill(pid, SIGSTOP);
+        if (pid == smashPID) return;
+
+        Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
+        bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+        delete cmd;
+        if (isPipe) {
+            res = killpg(pid, SIGSTOP);
+        }
+        else {
+            res = kill(pid, SIGSTOP);
+        }
         if (res != 0) {
             perror("smash error: kill failed");
             return;
@@ -25,14 +36,25 @@ void ctrlZHandler(int sig_num) {
 }
 
 void ctrlCHandler(int sig_num) {
-  // TODO: Add your implementation
+    // TODO: Add your implementation
     cout << "smash: got ctrl-C" << endl;
     SmallShell& smash = SmallShell::getInstance();
+    pid_t smashPID = smash.getSmashPid();
     JobsList::JobEntry* job = smash.getCurrentJob();
-    int res;
+    int res = -1;
     if (job) {
         pid_t pid = job->getJobPID();
-        res = kill(pid, SIGKILL);
+        if (pid == smashPID) return;
+
+        Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
+        bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+        delete cmd;
+        if (isPipe) {
+            res = killpg(pid, SIGKILL);
+        }
+        else {
+            res = kill(pid, SIGKILL);
+        }
         if (res != 0) {
             perror("smash error: kill failed");
             return;
@@ -47,33 +69,42 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
-  // TODO: Add your implementation
+    // TODO: Add your implementation
     cout << "smash: got an alarm" << endl;
     SmallShell& smash = SmallShell::getInstance();
     TimeoutEntry* entry = smash.getEntryToKill();
     pid_t pid = entry->getPID();
-    pid_t smashPID = getpid();
+    pid_t smashPID = smash.getSmashPid();
+    Command* cmd = smash.CreateCommand(entry->getCmd().c_str());
+    bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+    delete cmd;
     int res = -1;
     if (pid != smashPID) {
-        res = kill(pid, SIGKILL);
+        if (isPipe) {
+            pid_t pgid = getpgid(pid);
+            res = killpg(pgid, SIGKILL);
+        }
+        else {
+            res = kill(pid, SIGKILL);
+        }
         if (res != 0) {
             perror("smash error: kill failed");
             return;
         }
     }
     else {
-        /// if we got here there is a problem
-        res = kill(pid, SIGSTOP);
-        if (res != 0) {
-            perror("smash error: kill failed");
-            return;
-        }
+        return;
+//        /// if we got here there is a problem
+//        res = kill(pid, SIGSTOP);
+//        if (res != 0) {
+//            perror("smash error: kill failed");
+//            return;
+//        }
     }
-    string cmd = entry->getCmd();
-    cout << "smash: " << cmd << " timed out!" << endl;
+    string cmdStr = entry->getCmd();
+    cout << "smash: " << cmdStr << " timed out!" << endl;
     if (!smash.isTimedEmpty()) {
         int alarm_duration = smash.getMinTimeLeft();
         alarm(alarm_duration);
     }
 }
-
