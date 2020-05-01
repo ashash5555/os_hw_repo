@@ -982,6 +982,9 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, char **args, int numOfArgs,
     else {
         stringstream durationStr(args[1]);
         durationStr >> this->duration;
+        if (this->duration <= 0) {
+            perror("smash error: timeout: invalid arguments");
+        }
     }
 
     for (int i = 2; i < numOfArgs; i++) {
@@ -992,7 +995,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, char **args, int numOfArgs,
 }
 
 void TimeoutCommand::execute() {
-    if (cmdToRun.empty() || duration < 0) return;
+    if (cmdToRun.empty() || duration <= 0) return;
     SmallShell& smash = SmallShell::getInstance();
     smash.executeCommand(cmdToRun.c_str());
 }
@@ -1134,13 +1137,18 @@ void SmallShell::executeCommand(const char *cmd_line) {
         if (!(cmd->takesCPU())) {
             cmd = CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
         }
+        else {
+            this->addTimedCommand(timedCmd, getpid(), duration);
+            int alarm_duration = this->getMinTimeLeft();
+            alarm(alarm_duration);
+        }
     }
 
     bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
     bool isExternal = (typeid(*cmd) == typeid(ExternalCommand));
     bool isCopy = (typeid(*cmd) == typeid(CopyCommand));
     bool isQuit = (typeid(*cmd) == typeid(QuitCommand));
-    if (isExternal || isCopy || isQuit || isPipe || isTimed) {
+    if (isExternal || isCopy || isQuit || isPipe || (isTimed && !(cmd->takesCPU()))) {
         pid_t pid = fork();
 
         if(pid == -1) {
