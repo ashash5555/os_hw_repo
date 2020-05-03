@@ -110,7 +110,7 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line, bool takesCPU) : Command(cm
 ///JobsList///
 ///==================================================================================================================///
 JobsList::JobEntry::JobEntry(int jobID, pid_t pid, const string& cmd, bool isStopped) : jobID(jobID), jobPID(pid),
-                                                           cmd(cmd), start(time(nullptr)), isStopped(isStopped) {}
+                                                                                        cmd(cmd), start(time(nullptr)), isStopped(isStopped) {}
 int JobsList::JobEntry::getJobID() const { return jobID;}
 pid_t JobsList::JobEntry::getJobPID() const { return jobPID;}
 string JobsList::JobEntry::getJobCmd() const { return cmd;}
@@ -180,11 +180,21 @@ void JobsList::printJobsList() {
 
 void JobsList::killAllJobs() {
     vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    SmallShell& smash = SmallShell::getInstance();
     while (it != jobs.end()) {
         if (*it) {
             pid_t pid = (*it)->getJobPID();
             string cmd = (*it)->getJobCmd();
-            int res = kill(pid, SIGKILL);
+            Command* tempCmd = smash.CreateCommand((*it)->getJobCmd().c_str());
+            bool isPipe = (typeid(*tempCmd) == typeid(PipeCommand));
+            delete tempCmd;
+            int res = -1;
+            if (isPipe) {
+                res = killpg(pid, SIGKILL);
+            }
+            else {
+                res = kill(pid, SIGKILL);
+            }
             if (res != 0) {
                 perror("smash error: kill: invalid arguments");
             } else {
@@ -246,13 +256,30 @@ void JobsList::removeJobById(int jobId) {
             int itJobID = (*it)->getJobID();
             if (itJobID == jobId) {
                 /// waitpid with WNOHANG returns the pid if the process finished and 0 if it is still running
-                res = waitpid(pid, nullptr, WNOHANG);
+                res = waitpid(pid, NULL, WNOHANG);
                 if (res > 0) {
                     /// gets here if this process finished
                     delete *it;
                     *it = nullptr;
                     jobs.erase(it);
                 }
+                break;
+            }
+        }
+    }
+    updateJobsCount();
+}
+
+void JobsList::killThisFucker(int jobId) {
+    vector<JobsList::JobEntry*>::iterator it = jobs.begin();
+    for (; it != jobs.end(); ++it) {
+        if (*it) {
+            int itJobID = (*it)->getJobID();
+            if (itJobID == jobId) {
+                /// gets here if this process finished
+                delete *it;
+                *it = nullptr;
+                jobs.erase(it);
                 break;
             }
         }
@@ -581,7 +608,7 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
 
 void KillCommand::execute() {
     if (signal < 0 || jobID < 0) return;
-
+    SmallShell& smash = SmallShell::getInstance();
     JobsList::JobEntry* job = jobs->getJobById(jobID);
     if (!job) {
         string jobIdStr = to_string(jobID);
@@ -591,8 +618,16 @@ void KillCommand::execute() {
     }
 
     jobPID = job->getJobPID();
-
-    int res = kill(jobPID, signal);
+    int res = -1;
+    Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
+    bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+    delete cmd;
+    if (isPipe) {
+        res = killpg(jobPID, signal);
+    }
+    else {
+        res = kill(jobPID, signal);
+    }
     if (res != 0) {
         perror("smash error: kill failed");
     } else {
@@ -622,7 +657,7 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, char** args, int numO
     else if (!isInt(args[1])) {
         jobID = -2;
     }
-    /// job id given
+        /// job id given
     else {
         stringstream jobIdStr(args[1]);
         jobIdStr >> this->jobID;
@@ -640,7 +675,7 @@ void ForegroundCommand::execute() {
         job = jobs->getJobById(jobID);
         if (!job) {
             string jobIdStr = to_string(jobID);
-            string errMsg = "smash error: fg: job-id " + jobIdStr + "does not exist";
+            string errMsg = "smash error: fg: job-id " + jobIdStr + " does not exist";
             perror(errMsg.c_str());
         }
     } else {        /// jobID == -1
@@ -656,13 +691,30 @@ void ForegroundCommand::execute() {
 
     smash.updateCurrentJob(job);
     bool isStopped = job->isJobStopped();
+    Command* tempCmd = smash.CreateCommand(job->getJobCmd().c_str());
+    bool isPipe = (typeid(*tempCmd) == typeid(PipeCommand));
+    delete tempCmd;
     if (isStopped) {
+        int res = -1;
         job->resumeJob();
-        kill(pid, SIGCONT);     /// we return the job to continue, else it is already running in the background
+        if (isPipe) {
+            res = killpg(pid, SIGCONT);
+        }
+        else {
+            res = kill(pid, SIGCONT);     /// we return the job to continue, else it is already running in the background
+        }
+        if (res != 0) {
+            perror("smash error: kill failed");
+        }
     }
 
-    waitpid(pid, NULL, WUNTRACED);   /// "bring job to foreground" by waiting for it to finish
-
+    int status;
+    waitpid(pid, &status, WUNTRACED);   /// "bring job to foreground" by waiting for it to finish
+    if (!WIFSTOPPED(status)) {
+        jobs->killThisFucker(jobID);
+        smash.clearCurrentJob(false);
+        return;
+    }
 
     JobsList::JobEntry* res = jobs->getJobById(jobID);
     bool deleteEntry = !res;
@@ -783,7 +835,7 @@ void QuitCommand::execute() {
 ///PipeCommand///
 ///==================================================================================================================///
 PipeCommand::PipeCommand(const char *cmd_line, bool takes_cpu) : Command(cmd_line, takes_cpu), firstCmd(""),
-                                                                          secondCmd(""), redirectStdOut(true) {
+                                                                 secondCmd(""), redirectStdOut(true) {
     string cmd = this->getCommand();
     char* cmdChar = const_cast<char*> (cmd.c_str());
     _removeBackgroundSign(cmdChar);
@@ -840,15 +892,20 @@ void PipeCommand::execute() {
 //        waitpid(pid, NULL, WUNTRACED);
 //    }
 
+//    pid_t pgid = getpgid(getpid());
+    setpgid(getpid(), 0);
     pid_t pidFirst = fork();
     if (pidFirst < 0) {
         perror("smash error: fork failed");
     } else if (pidFirst == 0) {     /// first child - runs first command
-        setpgrp();
+//        setpgrp();
+//        setpgid(pidFirst, pgid);
+//        setsid();
         close(myPipe[0]);
         if (redirectStdOut) dup2(myPipe[1], 1);     /// stdout of the first command -> pipe write channel
         else dup2(myPipe[1], 2);     /// stderr of the first command -> pipe write channel
         close(myPipe[1]);
+        smash.markFromPipe();
         smash.executeCommand((this->firstCmd).c_str());
         exit(0);
     } else {      /// father
@@ -856,10 +913,13 @@ void PipeCommand::execute() {
         if (pidSecond < 0) {
             perror("smash error: fork failed");
         } else if (pidSecond == 0) {     /// second child - runs second command
-            setpgrp();
+//            setpgrp();
+//            setpgid(pidSecond, pgid);
+//            setsid();
             close(myPipe[1]);
             dup2(myPipe[0], 0);     /// stdin of second command -> pipe read channel
             close(myPipe[0]);
+            smash.markFromPipe();
             smash.executeCommand((this->secondCmd).c_str());
             exit(0);
         } else {      /// father
@@ -900,7 +960,7 @@ void ExternalCommand::execute() {
 ///TimeoutEntry///
 ///==================================================================================================================///
 TimeoutEntry::TimeoutEntry(const string cmd_line, pid_t pid, int duration) :
-                                            cmd(cmd_line), pid(pid), start(time(nullptr)), duration(duration){}
+        cmd(cmd_line), pid(pid), start(time(nullptr)), duration(duration){}
 
 time_t TimeoutEntry::getTimeLeft() const {
     time_t current = time(nullptr);
@@ -922,6 +982,9 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, char **args, int numOfArgs,
     else {
         stringstream durationStr(args[1]);
         durationStr >> this->duration;
+        if (this->duration <= 0) {
+            perror("smash error: timeout: invalid arguments");
+        }
     }
 
     for (int i = 2; i < numOfArgs; i++) {
@@ -932,7 +995,7 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, char **args, int numOfArgs,
 }
 
 void TimeoutCommand::execute() {
-    if (cmdToRun.empty() || duration < 0) return;
+    if (cmdToRun.empty() || duration <= 0) return;
     SmallShell& smash = SmallShell::getInstance();
     smash.executeCommand(cmdToRun.c_str());
 }
@@ -952,7 +1015,7 @@ const char * TimeoutCommand::getCmdToRun() const { return cmdToRun.c_str();}
 ///SmallShell///
 ///==================================================================================================================///
 SmallShell::SmallShell() : prompt("smash> "), lastWD(""), jobList(new JobsList()),
-                                           timedList(vector<TimeoutEntry*>()), currentJob(nullptr), smashPID(getpid()) {
+                           timedList(vector<TimeoutEntry*>()), currentJob(nullptr), smashPID(getpid()), fromPipe(false) {
 // TODO: add your implementation
 }
 
@@ -1065,7 +1128,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     if(!cmd) return;
 
     //TODO: clear finished jobs
-
+    jobList->removeFinishedJobs();
     int duration = -1;
     string timedCmd = cmd->getCommand();
     bool isTimed = (typeid(*cmd) == typeid(TimeoutCommand));
@@ -1074,13 +1137,18 @@ void SmallShell::executeCommand(const char *cmd_line) {
         if (!(cmd->takesCPU())) {
             cmd = CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
         }
+        else {
+            this->addTimedCommand(timedCmd, getpid(), duration);
+            int alarm_duration = this->getMinTimeLeft();
+            alarm(alarm_duration);
+        }
     }
 
     bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
     bool isExternal = (typeid(*cmd) == typeid(ExternalCommand));
     bool isCopy = (typeid(*cmd) == typeid(CopyCommand));
     bool isQuit = (typeid(*cmd) == typeid(QuitCommand));
-    if (isExternal || isCopy || isQuit || (isPipe && !(cmd->takesCPU())) || isTimed) {
+    if (isExternal || isCopy || isQuit || isPipe || (isTimed && !(cmd->takesCPU()))) {
         pid_t pid = fork();
 
         if(pid == -1) {
@@ -1089,7 +1157,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
         }
 
         if(pid == 0){ //Child
-            setpgrp();
+            if (!fromPipe) setpgrp();
             cmd->execute();
             delete cmd;
             cmd = nullptr;
