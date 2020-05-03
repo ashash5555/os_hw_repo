@@ -334,9 +334,9 @@ ChpromptCommand::ChpromptCommand(const string cmd, char **args, int numOfArgs, b
     }
     /// args = [arg1='chprompt', arg2, arg3, ..., argn, NULL]
     if (numOfArgs == 1) new_prompt = "smash> ";
-    else if (numOfArgs > 2) {
-        new_prompt = smash.getPrompt();
-    }
+    //else if (numOfArgs > 2) {
+    //    new_prompt = smash.getPrompt();
+    //}
         /// we assume numOfArgs == 2
     else {
         string arrow = "> ";
@@ -619,7 +619,7 @@ void KillCommand::execute() {
         cout << msg << endl;
         if(signal == SIGSTOP || signal == SIGTSTP) {
             job->stopJob();
-        }
+        } 
     }
 }
 ///==================================================================================================================///
@@ -970,19 +970,29 @@ const char * TimeoutCommand::getCmdToRun() const { return cmdToRun.c_str();}
 RedirectionCommand::RedirectionCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu, bool isOverwrite) : Command(cmd_line,takes_cpu), innerCmd(""),
                                         isOverWrite(isOverwrite), file("") {
     
-    ///TODO: check for input errors with redirection command
+    
     string cmd = this->getCommand();
     char* cmdChar = const_cast<char*> (cmd.c_str());
     _removeBackgroundSign(cmdChar);
     cmd = cmdChar;
 
-    int cmdLoc = 0;
+    int cmdLoc = -1;
+    int redir_cmd_len = -1;
     if (isOverWrite) { //i.e >>
         cmdLoc = cmd.find(">>");
+        redir_cmd_len = 2;
     } else {
         cmdLoc = cmd.find(">");
+        redir_cmd_len = 1;
     }
-    this->file = args[numOfArgs - 1];
+
+    string temp = "";
+    
+    temp = cmd.substr(cmdLoc + redir_cmd_len, cmd.size() - cmdLoc - redir_cmd_len);
+    temp = _trim(temp);
+    int firstFileLoc = temp.find_first_of(' ');
+    //get the first file name only
+    this->file = temp.substr(0, temp.find(" "));
     this->innerCmd = cmd.substr(0, cmdLoc);
 }
 
@@ -999,12 +1009,32 @@ void RedirectionCommand:: execute(){
 
     bool isChdir = (typeid(*otherCmd) == typeid(ChangeDirCommand));
     bool isChprompt = (typeid(*otherCmd) == typeid(ChpromptCommand));
-
+    bool isQuit = (typeid(*otherCmd) == typeid(KillCommand));
     delete otherCmd;
-    if (isChdir || isChprompt) {
+
+    if (isChdir || isChprompt || isQuit) { //will execute the command and redirect the output
+        int bkup = dup(1);
+        close(1);
+        int new_fd1 = -1;
+        if (isOverWrite) {
+            new_fd1 = open(this->file.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
+            if (new_fd1 < 0 ) {
+                perror("smash error: open failed");
+            }
+        } 
+        else { // ">" command
+            new_fd1 = open(this->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (new_fd1 < 0 ) {
+                perror("smash error: open failed");
+            }
+        }
         smash.executeCommand(this->innerCmd.c_str());
+        dup2(bkup, 1);
+        
     } else {
+        
         pid_t pid = fork();
+        setpgrp();
         
         if (pid < 0) {
             perror("smash error: fork failed");
@@ -1026,12 +1056,12 @@ void RedirectionCommand:: execute(){
                 }
             }
             smash.executeCommand(this->innerCmd.c_str());
-            close(new_fd);
-            dup2(1, backUpFD);
+            
+            dup2(backUpFD, 1);
             exit(0);
 
         } else { //father
-            while (wait(NULL) > 0) {}
+            waitpid(pid, NULL, WUNTRACED);
         }
 
 
@@ -1042,6 +1072,8 @@ void RedirectionCommand:: execute(){
 }
 
 ///==================================================================================================================///
+
+
 
 
 
@@ -1207,6 +1239,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             //TODO: add job
 
             if(isQuit) {
+                ///TODO: Is there any memory loss here?
                 waitpid(pid, NULL, WUNTRACED);
                 delete cmd;
                 cmd = nullptr;
@@ -1249,7 +1282,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
         }
     }
 
-    else { //
+    else {
         cmd->execute();
     }
     delete cmd;
