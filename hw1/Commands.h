@@ -54,8 +54,12 @@ public:
 
 class RedirectionCommand : public Command {
     // TODO: Add your data members
+private:
+    string innerCmd;
+    string file;
+    bool isOverWrite;
 public:
-    explicit RedirectionCommand(const char* cmd_line);
+    RedirectionCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu, bool isOverWrite);
     virtual ~RedirectionCommand() {}
     void execute() override;
     //void prepare() override;
@@ -223,6 +227,7 @@ class ForegroundCommand : public BuiltInCommand {
 private:
     int jobID;
     JobsList* jobs;
+    bool jobIDGiven;
 public:
     ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
     virtual ~ForegroundCommand() {}
