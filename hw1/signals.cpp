@@ -18,6 +18,10 @@ void ctrlZHandler(int sig_num) {
         if (pid == smashPID) return;
 
         Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
+        bool isTimed = (typeid(*cmd) == typeid(TimeoutCommand));
+        if (isTimed) {
+            cmd = smash.CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
+        }
         bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
         bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
         delete cmd;
@@ -48,6 +52,10 @@ void ctrlCHandler(int sig_num) {
         if (pid == smashPID) return;
 
         Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
+        bool isTimed = (typeid(*cmd) == typeid(TimeoutCommand));
+        if (isTimed) {
+            cmd = smash.CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
+        }
         bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
         bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
         delete cmd;
@@ -78,10 +86,15 @@ void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
     pid_t pid = entry->getPID();
     pid_t smashPID = smash.getSmashPid();
     Command* cmd = smash.CreateCommand(entry->getCmd().c_str());
+    bool isTimed = (typeid(*cmd) == typeid(TimeoutCommand));
+    if (isTimed) {
+        cmd = smash.CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
+    }
     bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
     bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
     delete cmd;
     int res = -1;
+    smash.removeFinishedJobsFromList();
     if (pid != smashPID) {
         if (isPipe || isRedir) {
             pid_t pgid = getpgid(pid);
@@ -91,7 +104,7 @@ void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
             res = kill(pid, SIGKILL);
         }
         if (res != 0) {
-            perror("smash error: kill failed");
+//            perror("smash error: kill failed");
             return;
         }
     }

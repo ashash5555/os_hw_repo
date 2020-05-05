@@ -199,7 +199,7 @@ void JobsList::killAllJobs() {
             if (res != 0) {///TODO: should be perror perhaps?
                 cerr << "smash error: kill: invalid arguments" << endl;
             } else {
-                cout << pid << " : " <<  cmd << endl;
+                cout << pid << ": " <<  cmd << endl;
             }
             delete *it;
             *it = nullptr;
@@ -608,7 +608,7 @@ bool isNum(string s)
 }
 
 KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsList *jobs, bool takes_cpu) :
-        BuiltInCommand(cmd_line, takes_cpu), signal(-1), jobID(-1), jobs(jobs) {
+        BuiltInCommand(cmd_line, takes_cpu), signal(-1), jobID(0), jobs(jobs) {
     if (numOfArgs > 3 || !args[1] || !args[2] || args[3]) {
 //        perror("smash error: kill: invalid arguments");
         validArgs = false;
@@ -620,7 +620,9 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
         inputNum = inputNum.substr(1);
         stringstream sigStr(inputNum);
         if (!isInt(inputNum) || !isInt(args[2])) {
-            validArgs = false;
+            stringstream jobIdStr(args[2]);
+            jobIdStr >> this->jobID;
+            if (jobID == 0 || !isInt(inputNum)) validArgs = false;
             //cerr << "smash error: kill: invalid arguments" << endl;        
         }
         else {
@@ -644,7 +646,10 @@ void KillCommand::execute() {
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
     }
-    if (signal < 0 || jobID < 0) return;
+    if (signal < 0 || jobID < 0) {
+        cerr << "smash error: kill: job-id " + to_string(jobID) + " does not exist" << endl;
+        return;
+    }
     SmallShell& smash = SmallShell::getInstance();
     JobsList::JobEntry* job = jobs->getJobById(jobID);
     if (!job) {
@@ -668,20 +673,20 @@ void KillCommand::execute() {
         res = kill(jobPID, signal);
     }
     if (res != 0) {
-//        perror("smash error: kill failed"); ///TODO: should be perror?
-        cerr << "smash error: kill: invalid arguments" << endl;
+        perror("smash error: kill failed"); ///TODO: should be perror?
+//        cerr << "smash error: kill: invalid arguments" << endl;
         return;
     } else {
         string sigStr = to_string(signal);
         string pidStr = to_string(jobPID);
         string msg = "signal number " + sigStr + " was sent to pid " + pidStr;
         cout << msg << endl;
-        if(signal == SIGSTOP || signal == SIGTSTP) {
-            job->stopJob();
-        }
-        else if (signal == SIGCONT) {
-            job->resumeJob();
-        }
+//        if(signal == SIGSTOP || signal == SIGTSTP) {
+//            job->stopJob();
+//        }
+//        else if (signal == SIGCONT) {
+//            job->resumeJob();
+//        }
     }
 }
 ///==================================================================================================================///
@@ -701,7 +706,9 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, char** args, int numO
     if (!args[1]) jobIDGiven = false;
 
     else if (!isInt(args[1])) {
-        validArg = false;
+        stringstream jobIdStr(args[1]);
+        jobIdStr >> this->jobID;
+        if (jobID == 0) validArg = false;
     }
         /// job id given
     else {
@@ -788,37 +795,41 @@ void ForegroundCommand::execute() {
 ///==================================================================================================================///
 
 BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
-        BuiltInCommand(cmd.c_str(), takes_cpu), inputJobID(-1), jobToStopID(-1), jobs(jobs) {
+        BuiltInCommand(cmd.c_str(), takes_cpu), inputJobID(0), jobToStopID(-1), jobs(jobs), alreadyRunning(false), noJobs(false), notExists(false) {
 
     if(numOfArgs > 2) {
         validArgs = false;
         //cerr << "smash error: bg: invalid arguments" << endl;
-        return;
     }
 
     //Checking legit argument 2
     if(args[1]) {
-        stringstream strStm(args[1]);
-        strStm >> inputJobID;
-        if(inputJobID <= 0) { // returns 
+        if (!isInt(args[1])) {
+            stringstream strStm(args[1]);
+            strStm >> inputJobID;
+            if (inputJobID == 0) validArgs = false;
+            else if (inputJobID < 0) notExists = true;
+        }
+        else {
+            stringstream strStm(args[1]);
+            strStm >> inputJobID;
+            if(inputJobID <= 0) { // returns
 //            perror("smash error: bg: invalid arguments");
-            //cerr << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
-            return;
-        } else { // Got a legit number in argument 2
-            JobsList::JobEntry* job = jobs->getJobById(inputJobID);
-            if(!job) {
-                cerr << "smash error: bg: job-id " << inputJobID << " does not exist" <<endl;
-                jobToStopID = -1;
-                return;
-            } else { // Found some Job ID
-                bool isStopped = job->isJobStopped();
-                if(!isStopped) {
-                    cerr << "smash error: bg: job-id " << inputJobID <<" is already running in the background" << endl;
-                    jobToStopID = -1;
-                    return;
-                } else { // Job is indeed stopped
-                    this->jobToStopID = inputJobID;
-                    this->jobToStop = job;
+                //cerr << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
+                notExists = true;
+
+            } else { // Got a legit number in argument 2
+                JobsList::JobEntry* job = jobs->getJobById(inputJobID);
+                if(!job) {
+                    notExists = true;
+                } else { // Found some Job ID
+                    bool isStopped = job->isJobStopped();
+                    if(!isStopped) {
+                        alreadyRunning = true;
+                    } else { // Job is indeed stopped
+                        this->jobToStopID = inputJobID;
+                        this->jobToStop = job;
+                    }
                 }
             }
         }
@@ -827,9 +838,7 @@ BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArg
         JobsList::JobEntry* foundStoppedJob  = jobs->getLastStoppedJob(&foundStoppedID);
         if(numOfArgs == 1){
             if(!foundStoppedJob) {
-                cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
-                jobToStopID = -1;
-                return;
+                noJobs = true;
             } else { //using bg without arguments
                 this->jobToStopID = foundStoppedID;
                 this->jobToStop = foundStoppedJob;
@@ -845,10 +854,28 @@ void BackgroundCommand::execute() {
         cerr << "smash error: bg: invalid arguments" << endl;
         return;
     }
-    if(jobToStopID <= 0) {
 
+    else if (noJobs) {
+        cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
         return;
     }
+
+    else if(notExists) {
+        cerr << "smash error: bg: job-id " << inputJobID << " does not exist" <<endl;
+        return;
+    }
+
+//    else if(jobToStopID <= 0) {
+//        cerr << "smash error: bg: there is no stopped jobs to resume" <<endl;
+//        return;
+//    }
+
+    else if (alreadyRunning) {
+        cerr << "smash error: bg: job-id " << inputJobID <<" is already running in the background" << endl;
+        return;
+    }
+
+
 
     string cmd = jobToStop->getJobCmd();
     int pidToCont;
@@ -999,7 +1026,7 @@ void ExternalCommand::execute() {
     cmdStr = cmdChar;
     cmdChar = const_cast<char*> (cmdStr.c_str());
     ///TODO: could be that bash needs to change to /bin/bash
-    char* const argv[4] = {const_cast<char*>("bash"), const_cast<char*>("-c"), cmdChar, NULL};
+    char* const argv[4] = {const_cast<char*>("/bin/bash"), const_cast<char*>("-c"), cmdChar, NULL};
     execv("/bin/bash", argv);
 
     perror("smash error: execv failed");
@@ -1325,16 +1352,19 @@ void SmallShell::executeCommand(const char *cmd_line) {
     bool isTimed = (typeid(*cmd) == typeid(TimeoutCommand));
     if (isTimed) {
         duration = static_cast<TimeoutCommand&>(*cmd).getDuration();
-        if (!(cmd->takesCPU())) {
+        if (duration != -1) {
             cmd = CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
         }
-        else {
-            if (duration != -1) {
-                this->addTimedCommand(timedCmd, getpid(), duration);
-                int alarm_duration = this->getMinTimeLeft();
-                alarm(alarm_duration);
-            }
-        }
+//        if (!(cmd->takesCPU())) {
+//            cmd = CreateCommand(static_cast<TimeoutCommand&>(*cmd).getCmdToRun());
+//        }
+//        else {
+//            if (duration != -1) {
+//                this->addTimedCommand(timedCmd, getpid(), duration);
+//                int alarm_duration = this->getMinTimeLeft();
+//                alarm(alarm_duration);
+//            }
+//        }
     }
 
     bool isRediraction = (typeid(*cmd) == typeid(RedirectionCommand));
@@ -1346,6 +1376,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
     bool isExternal = (typeid(*cmd) == typeid(ExternalCommand));
     bool isCopy = (typeid(*cmd) == typeid(CopyCommand));
     bool isQuit = (typeid(*cmd) == typeid(QuitCommand));
+    if (isTimed && duration != -1 && !isExternal && !isCopy && !isPipe && !(isRediraction && isForkable)) {
+        this->addTimedCommand(timedCmd, getpid(), duration);
+        int alarm_duration = this->getMinTimeLeft();
+        alarm(alarm_duration);
+    }
     if (isExternal || isCopy || isQuit || isPipe || (isTimed && !(cmd->takesCPU())) || (isRediraction && isForkable)) {
         pid_t pid = fork();
 
@@ -1373,7 +1408,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
             bool takesCPU = cmd->takesCPU();
             if (isTimed) {
                 if (duration != -1) {
-                    this->addTimedCommand(timedCmd, getpid(), duration);
+                    this->addTimedCommand(timedCmd, pid, duration);
                     int alarm_duration = this->getMinTimeLeft();
                     alarm(alarm_duration);
                 }

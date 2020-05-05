@@ -247,6 +247,9 @@ private:
     int jobToStopID;
     JobsList* jobs;
     JobsList::JobEntry* jobToStop;
+    bool alreadyRunning;
+    bool noJobs;
+    bool notExists;
 public:
     BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs);
     virtual ~BackgroundCommand() {}
@@ -353,6 +356,7 @@ public:
     void addSleepingJob(JobsList::JobEntry* job);
     void markFromPipe() {fromPipe = true;}
     void markFromRedir() {fromRedir = true;}
+    void removeFinishedJobsFromList() {jobList->removeFinishedJobs();}
 };
 
 #endif //SMASH_COMMAND_H_
