@@ -16,6 +16,8 @@ class Command {
 private:
     string cmd;
     bool takes_cpu;
+protected:
+    bool validArgs=true;
 public:
     Command(const char* cmd_line, bool takesCPU);
     virtual ~Command() = default;
@@ -58,10 +60,12 @@ private:
     string innerCmd;
     string file;
     bool isOverWrite;
+    int stdoutFD;
 public:
     RedirectionCommand(const char* cmd_line, char** args, int numOfArgs, bool takes_cpu, bool isOverWrite);
     virtual ~RedirectionCommand() {}
     void execute() override;
+    bool isForkable();
     //void prepare() override;
     //void cleanup() override;
 };
@@ -84,6 +88,7 @@ class ChangeDirCommand : public BuiltInCommand {
 private:
     string newWD;
     string currentWD;
+    bool hasPrevDir = true;
 public:
     ChangeDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
     ChangeDirCommand(const ChangeDirCommand&) = default;
@@ -228,6 +233,7 @@ private:
     int jobID;
     JobsList* jobs;
     bool jobIDGiven;
+    bool validArg = true;
 public:
     ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
     virtual ~ForegroundCommand() {}
@@ -237,7 +243,7 @@ public:
 class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
 private:
-    int jobID;
+    int inputJobID;
     int jobToStopID;
     JobsList* jobs;
     JobsList::JobEntry* jobToStop;
@@ -316,6 +322,7 @@ private:
     JobsList::JobEntry* currentJob;
     pid_t smashPID;
     bool fromPipe;
+    bool fromRedir;
     SmallShell();
 public:
     Command *CreateCommand(const char* cmd_line);
@@ -345,6 +352,7 @@ public:
     bool jobInList(int jobId) const;
     void addSleepingJob(JobsList::JobEntry* job);
     void markFromPipe() {fromPipe = true;}
+    void markFromRedir() {fromRedir = true;}
 };
 
 #endif //SMASH_COMMAND_H_

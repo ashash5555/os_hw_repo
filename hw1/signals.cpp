@@ -19,8 +19,9 @@ void ctrlZHandler(int sig_num) {
 
         Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
         bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+        bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
         delete cmd;
-        if (isPipe) {
+        if (isPipe || isRedir) {
             res = killpg(pid, SIGSTOP);
         }
         else {
@@ -48,8 +49,9 @@ void ctrlCHandler(int sig_num) {
 
         Command* cmd = smash.CreateCommand(job->getJobCmd().c_str());
         bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+        bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
         delete cmd;
-        if (isPipe) {
+        if (isPipe || isRedir) {
             res = killpg(pid, SIGKILL);
         }
         else {
@@ -77,10 +79,11 @@ void alarmHandler(int sig_num, siginfo_t* siginfo, void* context) {
     pid_t smashPID = smash.getSmashPid();
     Command* cmd = smash.CreateCommand(entry->getCmd().c_str());
     bool isPipe = (typeid(*cmd) == typeid(PipeCommand));
+    bool isRedir = (typeid(*cmd) == typeid(RedirectionCommand));
     delete cmd;
     int res = -1;
     if (pid != smashPID) {
-        if (isPipe) {
+        if (isPipe || isRedir) {
             pid_t pgid = getpgid(pid);
             res = killpg(pgid, SIGKILL);
         }
