@@ -196,7 +196,7 @@ void JobsList::killAllJobs() {
             else {
                 res = kill(pid, SIGKILL);
             }
-            if (res != 0) {
+            if (res != 0) {///TODO: should be perror perhaps?
                 cerr << "smash error: kill: invalid arguments" << endl;
             } else {
                 cout << pid << " : " <<  cmd << endl;
@@ -396,7 +396,7 @@ void ShowPidCommand::execute() {
 
     pid_t shellPID = smash.getSmashPid();
     if (shellPID < 0) {
-        cerr << "smash error: getpid failed" << endl;
+        cerr << "smash error: getpid failed" << endl;///TODO: Could be perror here?
     }
 
     cout << "smash pid is " << shellPID << endl;
@@ -431,7 +431,6 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
     }
         // LastPWD isnt set and got "-" argument(havent yet cd in this instance)
     else if(lastWD == "" && args[1] == lastWDCallBack) {
-//        cout << "smash error: cd: OLDPWD not set" << endl;
         hasPrevDir = false;
         //cerr << "smash error: cd: OLDPWD not set" << endl;
         newWD = currentWD;
@@ -999,7 +998,7 @@ void ExternalCommand::execute() {
     _removeBackgroundSign(cmdChar);
     cmdStr = cmdChar;
     cmdChar = const_cast<char*> (cmdStr.c_str());
-
+    ///TODO: could be that bash needs to change to /bin/bash
     char* const argv[4] = {const_cast<char*>("bash"), const_cast<char*>("-c"), cmdChar, NULL};
     execv("/bin/bash", argv);
 
@@ -1035,7 +1034,8 @@ TimeoutCommand::TimeoutCommand(const char *cmd_line, char **args, int numOfArgs,
         stringstream durationStr(args[1]);
         durationStr >> this->duration;
         if (this->duration <= 0) {
-            cerr << "smash error: timeout: invalid arguments" << endl;
+            validArgs = false;    
+            //cerr << "smash error: timeout: invalid arguments" << endl;
         }
     }
 
