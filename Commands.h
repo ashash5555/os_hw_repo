@@ -230,6 +230,7 @@ private:
     int jobID;
     JobsList* jobs;
     bool jobIDGiven;
+    bool validArg;
 public:
     ForegroundCommand(const char *cmd_line, char** args, int numOfArgs, JobsList *jobs, bool takes_cpu);
     virtual ~ForegroundCommand() {}
