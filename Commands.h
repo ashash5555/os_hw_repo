@@ -16,6 +16,8 @@ class Command {
 private:
     string cmd;
     bool takes_cpu;
+protected:
+    bool validArgs;
 public:
     Command(const char* cmd_line, bool takesCPU);
     virtual ~Command() = default;
@@ -86,6 +88,7 @@ class ChangeDirCommand : public BuiltInCommand {
 private:
     string newWD;
     string currentWD;
+    bool hasPrevDir;
 public:
     ChangeDirCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu=false);
     ChangeDirCommand(const ChangeDirCommand&) = default;
@@ -240,7 +243,7 @@ public:
 class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
 private:
-    int jobID;
+    int inputJobID;
     int jobToStopID;
     JobsList* jobs;
     JobsList::JobEntry* jobToStop;

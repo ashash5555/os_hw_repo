@@ -348,7 +348,7 @@ ChpromptCommand::ChpromptCommand(const string cmd, char **args, int numOfArgs, b
 //    else if (numOfArgs > 2) {
 //        new_prompt = smash.getPrompt();   /// why commenting this?
 //    }
-        /// we assume numOfArgs == 2
+        /// we assume numOfArgs == 2 and ignoring the rest
     else {
         string arrow = "> ";
         new_prompt = args[1] + arrow;
@@ -375,7 +375,7 @@ void GetCurrDirCommand::execute() {
     string path = res;
 
     if(!res){
-        cerr << "smash error: getcwd failed" << endl;
+        cerr << "smash error: getcwd failed" << endl;///TODO: Should be perror?
     }else {
         cout << path << endl;
     }
@@ -425,13 +425,15 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
         newWD = currentWD;
     }
     else if(numOfArgs > 2){
-        cerr << "smash error: cd: too many arguments" << endl;
+        this->validArgs = false;
+        //cerr << "smash error: cd: too many arguments" << endl;
         newWD = currentWD;
     }
         // LastPWD isnt set and got "-" argument(havent yet cd in this instance)
     else if(lastWD == "" && args[1] == lastWDCallBack) {
 //        cout << "smash error: cd: OLDPWD not set" << endl;
-        cerr << "smash error: cd: OLDPWD not set" << endl;
+        hasPrevDir = false;
+        //cerr << "smash error: cd: OLDPWD not set" << endl;
         newWD = currentWD;
     }
         // Handling case if we got "-" as the first argument (and already have done at least one cd call)
@@ -449,6 +451,14 @@ ChangeDirCommand::ChangeDirCommand(const string cmd, char **args, int numOfArgs,
 void ChangeDirCommand::execute() {
 
     SmallShell& smash = SmallShell::getInstance();
+
+    if(!validArgs) {
+        cerr << "smash error: cd: too many arguments" << endl;
+        return;
+    } else if(!hasPrevDir) {
+        cerr << "smash error: cd: OLDPWD not set" << endl;
+        return;
+    }
 
     if(newWD == currentWD) {
         return;
@@ -477,8 +487,9 @@ CopyCommand::CopyCommand(const char *cmd_line, char **args, int numOfArgs, bool 
         cerr << "smash error: cp: invalid arguments" << endl;
     }
 
-    else if (numOfArgs > 3 && takes_cpu) {
-        cerr << "smash error: too many arguments" << endl;      /// change?
+    else if (numOfArgs > 3 && takes_cpu) {///TODO: why takesCPU?
+        validArgs = false;
+        //cerr << "smash error: too many arguments" << endl;
     } else {
         /// check if pointers are valid
         if (args[1]) {
@@ -523,6 +534,11 @@ void clearBuffer(char* buffer, int size) {
 }
 ///TODO: check file per,issions and shit
 void CopyCommand::execute() {
+
+    if(!validArgs) {
+        cerr << "smash error: too many arguments" << endl;
+        return;
+    }
     if ((src.compare("") == 0) || (dest.compare("") == 0)) return;
     if (src.compare(dest) == 0) {
         cout << "smash: " << src << " was copied to " << dest << endl;
@@ -596,20 +612,25 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
         BuiltInCommand(cmd_line, takes_cpu), signal(-1), jobID(-1), jobs(jobs) {
     if (numOfArgs > 3 || !args[1] || !args[2] || args[3]) {
 //        perror("smash error: kill: invalid arguments");
-        cerr << "smash error: kill: invalid arguments" << endl;
+        validArgs = false;
+        //cerr << "smash error: kill: invalid arguments" << endl;
     }
     else{
         char dash = *args[1];
         string inputNum =  args[1];
         inputNum = inputNum.substr(1);
         stringstream sigStr(inputNum);
-        if (!isInt(inputNum) || !isInt(args[2])) cerr << "smash error: kill: invalid arguments" << endl;
+        if (!isInt(inputNum) || !isInt(args[2])) {
+            validArgs = false;
+            //cerr << "smash error: kill: invalid arguments" << endl;        
+        }
         else {
             sigStr >> this->signal;
             stringstream jobIdStr(args[2]);
             jobIdStr >> this->jobID;
             if (dash != '-' || signal <= 0 || jobID <= 0) {    /// change this condition to check the string!
-                cerr << "smash error: kill: invalid arguments" << endl;
+                //cerr << "smash error: kill: invalid arguments" << endl;
+                validArgs = false;
                 signal = -1;
                 jobID = -1;
             }
@@ -620,6 +641,10 @@ KillCommand::KillCommand(const char *cmd_line, char **args, int numOfArgs, JobsL
 
 
 void KillCommand::execute() {
+    if(!validArgs) {
+        cerr << "smash error: kill: invalid arguments" << endl;
+        return;
+    }
     if (signal < 0 || jobID < 0) return;
     SmallShell& smash = SmallShell::getInstance();
     JobsList::JobEntry* job = jobs->getJobById(jobID);
@@ -644,7 +669,7 @@ void KillCommand::execute() {
         res = kill(jobPID, signal);
     }
     if (res != 0) {
-//        perror("smash error: kill failed");
+//        perror("smash error: kill failed"); ///TODO: should be perror?
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
     } else {
@@ -669,7 +694,8 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, char** args, int numO
         BuiltInCommand(cmd_line, takes_cpu), jobID(0), jobs(jobs), jobIDGiven(true), validArg(true){
     /// check more options?
     if (numOfArgs > 2) {
-        cerr << "smash error: fg: invalid arguments" << endl;
+        validArgs = false;
+        //cerr << "smash error: fg: invalid arguments" << endl;
     }
     /// no job id given
 //    if (!args[1]) jobID = -1;
@@ -686,7 +712,7 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, char** args, int numO
 }
 
 void ForegroundCommand::execute() {
-    if (!validArg) {
+    if (!validArg || !validArgs) {
         cerr << "smash error: fg: invalid arguments" << endl;
         return;
     }
@@ -763,35 +789,36 @@ void ForegroundCommand::execute() {
 ///==================================================================================================================///
 
 BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArgs, bool takes_cpu, JobsList* jobs) :
-        BuiltInCommand(cmd.c_str(), takes_cpu), jobID(-1), jobToStopID(-1), jobs(jobs) {
+        BuiltInCommand(cmd.c_str(), takes_cpu), inputJobID(-1), jobToStopID(-1), jobs(jobs) {
 
     if(numOfArgs > 2) {
-        cerr << "smash error: bg: invalid arguments" << endl;
+        validArgs = false;
+        //cerr << "smash error: bg: invalid arguments" << endl;
         return;
     }
 
     //Checking legit argument 2
     if(args[1]) {
         stringstream strStm(args[1]);
-        strStm >> jobID;
-        if(jobID <= 0) {
+        strStm >> inputJobID;
+        if(inputJobID <= 0) { // returns 
 //            perror("smash error: bg: invalid arguments");
-            cerr << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
+            //cerr << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
             return;
         } else { // Got a legit number in argument 2
-            JobsList::JobEntry* job = jobs->getJobById(jobID);
+            JobsList::JobEntry* job = jobs->getJobById(inputJobID);
             if(!job) {
-                cerr << "smash error: bg: job-id " << jobID << " does not exist" <<endl;
+                cerr << "smash error: bg: job-id " << inputJobID << " does not exist" <<endl;
                 jobToStopID = -1;
                 return;
             } else { // Found some Job ID
                 bool isStopped = job->isJobStopped();
                 if(!isStopped) {
-                    cerr << "smash error: bg: job-id " << jobID <<" is already running in the background" << endl;
+                    cerr << "smash error: bg: job-id " << inputJobID <<" is already running in the background" << endl;
                     jobToStopID = -1;
                     return;
                 } else { // Job is indeed stopped
-                    this->jobToStopID = jobID;
+                    this->jobToStopID = inputJobID;
                     this->jobToStop = job;
                 }
             }
@@ -815,7 +842,14 @@ BackgroundCommand::BackgroundCommand(const string cmd, char** args, int numOfArg
 void BackgroundCommand::execute() {
 
     //no execution if command was bad
-    if(jobToStopID <= 0) {return;}
+    if(!validArgs) {
+        cerr << "smash error: bg: invalid arguments" << endl;
+        return;
+    }
+    if(jobToStopID <= 0) {
+
+        return;
+    }
 
     string cmd = jobToStop->getJobCmd();
     int pidToCont;
