@@ -34,17 +34,20 @@ asmlinkage long increment_vruntime(long delta) {
 	}
 
 	p = current;
-	rq = task_rq(p);
+	// rq = task_rq(p);
+	rq = this_rq(p);
 	se = &(p->se);
 	
-	deactivate_task(rq, current, DEQUEUE_NOCLOCK);
+	// deactivate_task(rq, current, DEQUEUE_NOCLOCK);
+	deactivate_task(rq, current, 0);
 
 	vruntime_ns = se->vruntime;
 	vruntime_ns = vruntime_ns + delta;
 
 	se->vruntime = vruntime_ns;
 
-	activate_task(rq, current, ENQUEUE_NOCLOCK);
+	// activate_task(rq, current, ENQUEUE_NOCLOCK);
+	activate_task(rq, current, 0);
 
 	// resched_curr(rq);
 
