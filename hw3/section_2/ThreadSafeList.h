@@ -35,10 +35,9 @@ public:
     class Node {
     public:
         T data;
-        pthread_mutex_t mutex;  /// each node needs a lock to prevent other threads from using it
+        pthread_mutex_t mutex;
         Node *next;
-
-        /// public methods
+        // TODO: Add your methods and data members
         Node(const T& data) : data(data), mutex(PTHREAD_MUTEX_INITIALIZER), next(nullptr) {}
         Node(const Node&) = delete;
         virtual ~Node() {
@@ -46,7 +45,6 @@ public:
             pthread_mutex_destroy(&mutex);
         }
 
-        /// for easier reading
         void lock() {
             pthread_mutex_lock(&mutex);
         }
@@ -56,7 +54,6 @@ public:
 
     };
 
-    /// dummy node class, initialized with '0' because it is common for all primitive types
     class DNode : public Node {
     public:
         DNode() : Node(0) {}
@@ -74,13 +71,11 @@ public:
         Node* it = head;
         Node* prev = nullptr;
 
-        /// locking the dummy head and the first item in the list
         head->lock();
         head->next->lock();
         prev = head;
         it = prev->next;
 
-        /// iterate as long as the iterator is not tail
         while (it && typeid(*it) != typeid(DNode)) {
             if (data > it->data) {
                 it->next->lock();   /// now holding 3 locks     prev, it, it->next
@@ -108,7 +103,6 @@ public:
             }
         }
 
-        /// getting here if iterator equals to tail
         if (typeid(*it) == typeid(DNode)) {
             prev->next = to_add;
             to_add->next = it;
@@ -133,21 +127,17 @@ public:
         Node* it = head;
         Node* prev = nullptr;
 
-        /// locking the dummy head and the first item in the list
         head->lock();
         head->next->lock();
         prev = head;
         it = prev->next;
 
-        /// iterate as long as the iterator is not tail
         while (it && typeid(*it) != typeid(DNode)) {
             if (it->data == value) {
-                
-                /// locking the next item: prev(locked)->it(locked)->it_next(locked)
                 it->next->lock();
                 prev->next = it->next;
                 it->next->unlock();
-                it->next = nullptr; /// prev->it_next
+                it->next = nullptr;
 
                 __remove_test_hook();
 
@@ -229,7 +219,6 @@ public:
         pthread_mutex_unlock(&mutex);
     }
 
-
     // bool isSorted(){
 
     //     head->lock();
@@ -261,6 +250,7 @@ private:
     DNode* tail;
     pthread_mutex_t mutex;
     unsigned int size;
+// TODO: Add your own methods and data members
 };
 
 #endif //THREAD_SAFE_LIST_H_

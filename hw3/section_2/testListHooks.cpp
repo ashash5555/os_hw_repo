@@ -39,7 +39,7 @@ int main() {
   ((MyList<int>*)l)->activateHook(10);
   l->insert(17);
 
-  ((MyList<int>*)l)->setValueToRemove(6);
+  ((MyList<int>*)l)->setValueToRemove(4);   /// current state: 0,2,4,6,8,12,14,16,17,18
   l->insert(11);
 
   assert(l->getSize() == 10);

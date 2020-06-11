@@ -4,7 +4,7 @@
 #include <ctime> // temporary for random tests
 
 #define magicNumber 200             // TODO set the magic number as you wish
-#define threadsNumber 20            // TODO set the number of threads that your PC can handle
+#define threadsNumber 60            // TODO set the number of threads that your PC can handle
 
 using namespace std;
 
@@ -23,7 +23,7 @@ void* start_routine(void* l) {
     }
     assert(list->isSorted());
 
-    //list->print();                        //TODO remove comment if you want to print. ! will increase your tests time !
+    // list->print();                        //TODO remove comment if you want to print. ! will increase your tests time !
 
     int elementsToRemove = rand()%(numOfinserts+1); // choose randomly how many nodes to remove from list
     int removalCounter=0;
@@ -34,7 +34,7 @@ void* start_routine(void* l) {
     }
     assert(list->isSorted());
 
-    //list->print();                        //TODO remove comment if you want to print. ! will increase your tests time !
+    // list->print();                        //TODO remove comment if you want to print. ! will increase your tests time !
 
     return nullptr;
 }
@@ -116,15 +116,15 @@ int main() {
     srand(time(NULL));                          //for random numbers in tests
     cout << "Start testing ThreadSafeList" << endl;
     for(int i = 1 ; i<=1000 ; i++) {                  // TODO set the number of tests you need
-//        std::cout << "Start Test number: " << i << std::endl;     //TODO remove comments if you want to print. ! will increase your tests time !
-//        std::cout
-//                << "########################################################################### \n"
-//                << std::endl;
+        std::cout << "Start Test number: " << i << std::endl;     //TODO remove comments if you want to print. ! will increase your tests time !
+        std::cout
+                << "########################################################################### \n"
+                << std::endl;
         Test<int>();                                 //TODO choose the class T you want to test.
-//        std::cout << "Finish Test number: " << i << std::endl;      //TODO remove comments if you want to print. ! will increase your tests time !
-//        std::cout
-//                << "########################################################################### \n"
-//                << std::endl;
+        std::cout << "Finish Test number: " << i << std::endl;      //TODO remove comments if you want to print. ! will increase your tests time !
+        std::cout
+                << "########################################################################### \n"
+                << std::endl;
     }
     cout << "Finish testing ThreadSafeList" << endl;
     if(time(&end_time) != -1){
