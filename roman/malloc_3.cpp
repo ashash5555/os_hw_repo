@@ -83,6 +83,11 @@ static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
     MallocMetadata* prev_ptr = nullptr;
     // void* heap_end = sbrk(0);
 
+    /* Added support for mmap allocations  */
+
+    bool is_mmap = false;
+    is_mmap = (head->is_mmapped);
+
     while (ptr) {
         if (to_add->size > ptr->size) {
             prev_ptr = ptr;
@@ -261,7 +266,32 @@ int _calc_mmap_size(size_t size) {
     int number_of_pages = ceil(size / pagesize);
     return number_of_pages;
 }
-///===========================================================================================///
+
+
+
+
+void _remove_from_mmap_list(void* p){
+    MallocMetadata* metadata = _get_metadata(p);
+    MallocMetadata* temp = nullptr;
+    MallocMetadata* prev_ptr = metadata->prev;
+    MallocMetadata* next_ptr = metadata->next;
+
+    int page_size = getpagesize();
+    int num_pages_to_delete = _calc_mmap_size(metadata->size + data.size_of_meta_data);
+    num_pages_to_delete = num_pages_to_delete * page_size;
+
+    temp  = metadata; //for testing
+    prev_ptr->next = next_ptr;
+    next_ptr->prev = prev_ptr;
+
+    munmap(p,num_pages_to_delete);
+
+    //TODO: Do we delete the data after program exits?
+
+}
+
+
+ ///===========================================================================================///
 
 
 size_t _num_free_blocks() {return data.num_of_free_blocks;}
@@ -275,6 +305,7 @@ void* smalloc (size_t size) {
     MallocMetadata* new_metadata = nullptr;
     void* new_data = nullptr;
     MallocMetadata* ptr = nullptr;
+
     bool is_mmap = false;
     if (size >= MIN_MMAP_SIZE) {
         ptr = (MallocMetadata*)heap_mmap;
@@ -283,7 +314,7 @@ void* smalloc (size_t size) {
         ptr = (MallocMetadata*)heap_sbrk;
     }
     
-    // list is sorted
+    // list is sorted and iterate through the sbrk list
     while (!is_mmap && ptr) {
         
         /// Check if the blog is big enough
@@ -302,19 +333,38 @@ void* smalloc (size_t size) {
         }
     }
 
-    size_t page_size = getpagesize();
+    //Wilderness territory
+    size_t diff = 0;
+    if(data.num_of_allocated_blocks > 0 && ptr->is_free) {
+        MallocMetadata* biggest_block_meta = _get_metadata(ptr);
+        MallocMetadata* meta_pointer = biggest_block_meta++;
+        void* old_biggest_block_start = (void*)(meta_pointer); // TODO: Does this work?
+        diff = size - ptr->size;
+        void* temp = _aux_smalloc(diff);
+        biggest_block_meta->is_free = false;
+        biggest_block_meta->next = nullptr;
+        biggest_block_meta->size = size;
+        return old_biggest_block_start;      
+    }
+
+    
 
     // Adding new member to either list
     if(is_mmap) {   // mmap list
+        size_t page_size = getpagesize();
+        size_t metadata_size_in_pages = _calc_mmap_size(data.size_of_meta_data);
+        metadata_size_in_pages = metadata_size_in_pages * page_size;
         int number_of_pages = _calc_mmap_size(size);
-        size_t mmap_size = number_of_pages * page_size;
-        new_metadata = mmap(nullptr, 
-                            mmap_size, 
-                            PROC_WRITE | PROC_READ, 
-                            MAP_ANONYMOUS | MAP_PRIVATE,
-                            0,
-                            0);
-        
+        size_t data_size_in_pages = number_of_pages * page_size;
+        void* temp_ptr = nullptr;
+        temp_ptr = mmap(nullptr, 
+                        data_size_in_pages + metadata_size_in_pages, 
+                        PROT_WRITE | PROT_READ, 
+                        MAP_ANONYMOUS | MAP_PRIVATE,
+                        0,
+                        0);
+        new_metadata = (MallocMetadata*)temp_ptr;
+        new_data = static_cast<char*>(temp_ptr) + data.size_of_meta_data; //TODO: Maybe reinterpert_cast?
 
         _add_allocation(new_metadata, (MallocMetadata*)heap_mmap);
     } else {        //sbrk list
@@ -346,8 +396,16 @@ void sfree(void* p) {
     if (p == nullptr) return;
 
     MallocMetadata* p_metadata = _get_metadata(p);
+    bool is_mmap = p_metadata->is_mmapped;
     if (p_metadata->is_free) return;
-    _mark_free(p_metadata);
+    
+
+    if(is_mmap) {
+        _remove_from_mmap_list(p);
+    } else {
+        _merge_adjacent_blocks(p);
+        _mark_free(p_metadata);
+    }   
 }
 
 void* srealloc(void* oldp, size_t size) {
