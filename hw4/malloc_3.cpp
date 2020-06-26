@@ -32,7 +32,7 @@ struct AllocationsData
 };
 ///===========================================================================================///
 
-void* _aux_smalloc(size_t);
+static void* _aux_smalloc(size_t);
 ///==========================================Globals==========================================///
 // static void* heap = sbrk(0);
 static AllocationsData data = {0, 0, 0, 0, 0, sizeof(MallocMetadata)};
@@ -63,6 +63,7 @@ static void* heap_sbrk = _get_dummy_sbrk_allocs();
 static void* heap_mmap = _get_dummy_mmap_allocs();
 ///=======================================Aux functions=======================================///
 static void _mark_free(MallocMetadata* to_mark) {
+    if (to_mark->is_free) return;
     to_mark->is_free = true;
 
     /// update data
@@ -92,6 +93,7 @@ static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
         }
         else if (to_add->size < ptr->size) {
             to_add->next = ptr;
+            to_add->prev = ptr->prev;
             prev_ptr->next = to_add;
             ptr->prev = to_add;
             break;
@@ -155,7 +157,7 @@ static MallocMetadata* _get_metadata(void* p) {
 }
 
 static void* _get_data_after_metadata(MallocMetadata* metadata) {
-    unsigned char* byteptr = reinterpret_cast<unsigned char*>(metadata);
+    // unsigned char* byteptr = reinterpret_cast<unsigned char*>(metadata);
     MallocMetadata* p = (MallocMetadata*)(static_cast<char*>((void*)metadata) + data.size_of_meta_data);
     return (void*)p;
 }
@@ -174,7 +176,8 @@ void _split(void* p, size_t size) {
     /// 
     _add_allocation(new_metadata, (MallocMetadata*)heap_sbrk);
     data.num_of_allocated_bytes -= new_metadata->size + data.size_of_meta_data;
-    data.num_of_free_bytes -= data.size_of_meta_data;
+    data.num_of_free_bytes += new_metadata->size;
+    data.num_of_free_blocks++;
 }
 
 void* _merge_adjacent_blocks(void* p) {
@@ -266,7 +269,7 @@ bool _should_split(void* p, size_t want_to_alloc) {
     if (p == nullptr) return false;
     MallocMetadata* metadata = _get_metadata(p);   
     size_t curr_size = metadata->size;
-    size_t metadata_size = sizeof(MallocMetadata); //TODO: check this again for measurments
+    size_t metadata_size = data.size_of_meta_data; //TODO: check this again for measurments
     int remaining_size = 0;
 
     remaining_size = curr_size - metadata_size - want_to_alloc;
@@ -285,7 +288,7 @@ int _calc_mmap_size(size_t size) {
 
 void _remove_from_mmap_list(void* p){
     MallocMetadata* metadata = _get_metadata(p);
-    MallocMetadata* temp = nullptr;
+//    MallocMetadata* temp = nullptr;   /// did not compile with this
     MallocMetadata* prev_ptr = metadata->prev; //prev->p->next
     MallocMetadata* next_ptr = metadata->next;
 
@@ -293,7 +296,7 @@ void _remove_from_mmap_list(void* p){
     int num_pages_to_delete = _calc_mmap_size(metadata->size + data.size_of_meta_data);
     num_pages_to_delete = num_pages_to_delete * page_size; // num*4096
 
-    temp  = metadata; //for testing
+//    temp  = metadata; //for testing   /// did not compile with this
     prev_ptr->next = next_ptr; 
     next_ptr->prev = prev_ptr;
 
@@ -310,6 +313,7 @@ size_t _num_free_bytes() {return data.num_of_free_bytes;}
 size_t _num_allocated_blocks() {return data.num_of_allocated_blocks;}
 size_t _num_allocated_bytes() {return data.num_of_allocated_bytes;}
 size_t _size_meta_data() {return data.size_of_meta_data;}
+size_t _num_meta_data_bytes() {return data.num_of_meta_data_bytes;}
 
 void* smalloc (size_t size) {
     if (size == 0 || size > MAX_SIZE) return nullptr;
@@ -329,7 +333,7 @@ void* smalloc (size_t size) {
     // list is sorted and iterate through the sbrk list
     while (!is_mmap && ptr) {
         
-        /// Check if the blog is big enough
+        /// Check if the block is big enough
         if (ptr->size >= size && ptr->is_free) {
             // check if the block can be splitted i.e after the split the unused part
             // has at least 128 bytes exluding metadata
@@ -337,8 +341,10 @@ void* smalloc (size_t size) {
                 _split(ptr, size);
             }
             _mark_used(ptr);
-            ptr += data.size_of_meta_data; //TODO: check
-            return ptr;
+            // ptr += data.size_of_meta_data; //TODO: check
+            void* new_ptr = _get_data_after_metadata(ptr);
+            return new_ptr;
+            // return ptr;
         }
         else {
             last_block = ptr;
@@ -349,18 +355,25 @@ void* smalloc (size_t size) {
     //Wilderness territory
     size_t diff = 0;
     if(data.num_of_allocated_blocks > 0 && last_block->is_free) {
-        MallocMetadata* biggest_block_meta = _get_metadata(last_block);
-        void* old_biggest_block_start = _get_data_after_metadata(biggest_block_meta);
+//        MallocMetadata* biggest_block_meta = _get_metadata(last_block);
+//        void* old_biggest_block_start = _get_data_after_metadata(biggest_block_meta);
+        void* old_biggest_block_start = _get_data_after_metadata(last_block);
 
-        diff = size - last_block->size;
-        void* temp = _aux_smalloc(diff);
+        size_t  old_size = last_block->size;
+        diff = size - old_size;
+//        void* temp = _aux_smalloc(diff);  /// did not compile with this
+        _aux_smalloc(diff);                 /// so changed to this
 
-        biggest_block_meta->is_free = false;
-        biggest_block_meta->next = nullptr;
-        biggest_block_meta->size = size;
+//        biggest_block_meta->is_free = false;
+//        biggest_block_meta->next = nullptr;
+//        biggest_block_meta->size = size;
+        last_block->is_free = false;
+        last_block->next = nullptr;
+        last_block->size = size;
 
         //Update data
-        data.num_of_free_bytes -= size;
+//        data.num_of_free_bytes -= size;
+        data.num_of_free_bytes -= old_size;
         data.num_of_free_blocks--;
         data.num_of_allocated_bytes += diff;
         return old_biggest_block_start;      
@@ -387,8 +400,10 @@ void* smalloc (size_t size) {
 
         _add_allocation(new_metadata, (MallocMetadata*)heap_mmap);
     } else {        //heap/sbrk list
-        new_metadata = (MallocMetadata*)_aux_smalloc(sizeof(MallocMetadata));
+        new_metadata = (MallocMetadata*)_aux_smalloc(data.size_of_meta_data);
         new_data = _aux_smalloc(size);
+        new_metadata->size = size;
+        new_metadata->is_free = false;
         _add_allocation(new_metadata, (MallocMetadata*)heap_sbrk);
     }
 
@@ -437,7 +452,8 @@ void* srealloc(void* oldp, size_t size) {
         size_t diff = 0;
 
         diff = size - oldp_metadata->size;
-        void* temp = _aux_smalloc(diff);
+//        void* temp = _aux_smalloc(diff);  /// did not compile with this
+        _aux_smalloc(diff);                 /// so changed to this
         oldp_metadata->is_free = false;
         oldp_metadata->size = size;
 
@@ -463,7 +479,12 @@ void* srealloc(void* oldp, size_t size) {
     }
     
     // this is a fucking heap situation
-    if (oldp_metadata->size >= size) return oldp;   /// reusing block
+    if (oldp_metadata->size >= size) {
+        if (_should_split(oldp, size)) {
+            _split(oldp, size);
+        }
+        return oldp;   /// reusing block
+    }
     
     // void* ptr = _get_data_after_metadata(oldp_metadata);
     void* ptr = _merge_adjacent_blocks(oldp);   /// b, c, d are taken care of here.

@@ -28,7 +28,7 @@ struct AllocationsData
 
 ///===========================================================================================///
 
-void* _aux_smalloc(size_t);
+static void* _aux_smalloc(size_t);
 ///==========================================Globals==========================================///
 // static void* heap = sbrk(0);
 static AllocationsData data = {0, 0, 0, 0, 0, sizeof(MallocMetadata)};
@@ -77,6 +77,7 @@ static void _add_allocation(MallocMetadata* to_add) {
         }
         else if (to_add->size < ptr->size) {
             to_add->next = ptr;
+            to_add->prev = ptr->prev;
             prev_ptr->next = to_add;
             ptr->prev = to_add;
             break;
@@ -139,6 +140,11 @@ static MallocMetadata* _get_metadata(void* p) {
     return p_metadata;
 }
 
+static void* _get_data_after_metadata(MallocMetadata* metadata) {
+//    unsigned char* byteptr = reinterpret_cast<unsigned char*>(metadata);
+    MallocMetadata* p = (MallocMetadata*)(static_cast<char*>((void*)metadata) + data.size_of_meta_data);
+    return (void*)p;
+}
 ///===========================================================================================///
 
 
@@ -147,6 +153,7 @@ size_t _num_free_bytes() {return data.num_of_free_bytes;}
 size_t _num_allocated_blocks() {return data.num_of_allocated_blocks;}
 size_t _num_allocated_bytes() {return data.num_of_allocated_bytes;}
 size_t _size_meta_data() {return data.size_of_meta_data;}
+size_t _num_meta_data_bytes() {return data.num_of_meta_data_bytes;}
 
 
 void* smalloc (size_t size) {
@@ -157,8 +164,10 @@ void* smalloc (size_t size) {
     while (ptr) {
        if (ptr->size >= size && ptr->is_free) {
            _mark_used(ptr);
-           ptr += data.size_of_meta_data;
-           return ptr;
+//           ptr += data.size_of_meta_data;
+           void* new_ptr = _get_data_after_metadata(ptr);
+           return new_ptr;
+//           return ptr;
        }
        else {
             ptr = ptr->next;
@@ -166,12 +175,14 @@ void* smalloc (size_t size) {
     }
 
     /// does the last element still points to end of heap???
-    new_addrs = (MallocMetadata*)_aux_smalloc(size);
+    new_addrs = (MallocMetadata*)_aux_smalloc(size+data.size_of_meta_data);
     new_addrs->size = size;
     new_addrs->is_free = false;
     _add_allocation(new_addrs);
-    new_addrs += data.size_of_meta_data;
-    return new_addrs;
+//    new_addrs += data.size_of_meta_data;
+    void* new_ptr = _get_data_after_metadata(new_addrs);
+    return new_ptr;
+//    return new_addrs;
 }
 
 void* scalloc(size_t num, size_t size) {

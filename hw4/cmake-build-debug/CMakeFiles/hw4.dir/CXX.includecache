@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_2.cpp
+unistd.h
+-
+string.h
+-
+
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_3.cpp
+unistd.h
+-
+string.h
+-
+sys/mman.h
+-
+math.h
+-
+
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp
+cstdio
+-
+cassert
+-
+malloc_2.cpp
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_2.cpp
+malloc_3.cpp
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_3.cpp
+
