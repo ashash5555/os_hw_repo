@@ -83,10 +83,6 @@ static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
     MallocMetadata* prev_ptr = nullptr;
     // void* heap_end = sbrk(0);
 
-    /* Added support for mmap allocations  */
-
-    bool is_mmap = false;
-    is_mmap = (head->is_mmapped);
 
     while (ptr) {
         if (to_add->size > ptr->size) {
@@ -158,6 +154,12 @@ static MallocMetadata* _get_metadata(void* p) {
     return p_metadata;
 }
 
+static void* _get_data_after_metadata(MallocMetadata* metadata) {
+    unsigned char* byteptr = reinterpret_cast<unsigned char*>(metadata);
+    MallocMetadata* p = (MallocMetadata*)(static_cast<char*>((void*)metadata) + data.size_of_meta_data);
+    return (void*)p;
+}
+
 void _split(void* p, size_t size) {
     MallocMetadata* p_metadata = _get_metadata(p);
     size_t new_block_size = p_metadata->size - size;
@@ -175,51 +177,60 @@ void _split(void* p, size_t size) {
     data.num_of_free_bytes -= data.size_of_meta_data;
 }
 
-void _merge_adjacent_blocks(void* p) {
+void* _merge_adjacent_blocks(void* p) {
     MallocMetadata* p_metadata = _get_metadata(p);
     MallocMetadata* prev_metadata = p_metadata->prev;
     MallocMetadata* next_metadata = p_metadata->next;
-    if (prev_metadata && next_metadata) {
-        if (prev_metadata->is_free && next_metadata->is_free) {
-            prev_metadata->size += p_metadata->size + next_metadata->size + 2*data.size_of_meta_data;
-            prev_metadata->next = next_metadata->next;
-            if (next_metadata->next->prev) next_metadata->next->prev = prev_metadata;
+    void* return_ptr = nullptr;
 
-            data.num_of_allocated_blocks -= 2;
-            data.num_of_free_blocks -= 2;
-            data.num_of_free_bytes += p_metadata->size + 2*data.size_of_meta_data;
-            data.num_of_meta_data_bytes -= 2*data.size_of_meta_data;
-        }
-        else if (prev_metadata->is_free && !(next_metadata->is_free)) {
+    //Priority list for merging (detailed in srealloc)
+    if (prev_metadata && next_metadata) { //Both sides available
+        if (prev_metadata->is_free && !(next_metadata->is_free)) {//Merge Prev 1st
             prev_metadata->size += p_metadata->size + data.size_of_meta_data;
             prev_metadata->next = p_metadata->next;
             p_metadata->next->prev = prev_metadata;
+            return_ptr = _get_data_after_metadata(prev_metadata);
 
             data.num_of_allocated_blocks --;
             data.num_of_free_blocks --;
             data.num_of_free_bytes += p_metadata->size + data.size_of_meta_data;
             data.num_of_meta_data_bytes -= data.size_of_meta_data;
         }
-        else if (!(prev_metadata->is_free) && next_metadata->is_free) {
+        else if (!(prev_metadata->is_free) && next_metadata->is_free) { //Merge Next 2nd
             p_metadata->size += next_metadata->size + data.size_of_meta_data;
             p_metadata->next = next_metadata->next;
             p_metadata->next->prev = p_metadata;
+            return_ptr = _get_data_after_metadata(p_metadata);
 
             data.num_of_allocated_blocks --;
             data.num_of_free_blocks --;
             data.num_of_free_bytes += next_metadata->size + data.size_of_meta_data;
             data.num_of_meta_data_bytes -= data.size_of_meta_data;
         }
+        else if (prev_metadata->is_free && next_metadata->is_free) { //Merge both last
+            prev_metadata->size += p_metadata->size + next_metadata->size + 2*data.size_of_meta_data;
+            prev_metadata->next = next_metadata->next;
+            if (next_metadata->next->prev) next_metadata->next->prev = prev_metadata;
+            return_ptr = _get_data_after_metadata(prev_metadata);
+
+            data.num_of_allocated_blocks -= 2;
+            data.num_of_free_blocks -= 2;
+            data.num_of_free_bytes += p_metadata->size + 2*data.size_of_meta_data;
+            data.num_of_meta_data_bytes -= 2*data.size_of_meta_data;
+        }
+        
         else {
             _mark_free(p_metadata);
+            return_ptr = _get_data_after_metadata(p_metadata);
         }
 
-        return;
+        return return_ptr;
     }
-
+    //One sided checks
     else if (prev_metadata && prev_metadata->is_free && !next_metadata) {
         prev_metadata->size += p_metadata->size + data.size_of_meta_data;
         prev_metadata->next = p_metadata->next;
+        return_ptr = _get_data_after_metadata(prev_metadata);
 
         data.num_of_allocated_blocks --;
         data.num_of_free_blocks --;
@@ -231,6 +242,7 @@ void _merge_adjacent_blocks(void* p) {
         p_metadata->size += next_metadata->size + data.size_of_meta_data;
         p_metadata->next = next_metadata->next;
         if (next_metadata->next) next_metadata->next->prev = p_metadata;
+        return_ptr = _get_data_after_metadata(p_metadata);
 
         data.num_of_allocated_blocks --;
         data.num_of_free_blocks --;
@@ -240,9 +252,10 @@ void _merge_adjacent_blocks(void* p) {
 
     else {
         _mark_free(p_metadata);
+        return_ptr = _get_data_after_metadata(p_metadata);
     }
 
-    return;
+    return return_ptr;
 }
 
 // Returns True if we should split the block, else False.
@@ -273,20 +286,19 @@ int _calc_mmap_size(size_t size) {
 void _remove_from_mmap_list(void* p){
     MallocMetadata* metadata = _get_metadata(p);
     MallocMetadata* temp = nullptr;
-    MallocMetadata* prev_ptr = metadata->prev;
+    MallocMetadata* prev_ptr = metadata->prev; //prev->p->next
     MallocMetadata* next_ptr = metadata->next;
 
     int page_size = getpagesize();
     int num_pages_to_delete = _calc_mmap_size(metadata->size + data.size_of_meta_data);
-    num_pages_to_delete = num_pages_to_delete * page_size;
+    num_pages_to_delete = num_pages_to_delete * page_size; // num*4096
 
     temp  = metadata; //for testing
-    prev_ptr->next = next_ptr;
+    prev_ptr->next = next_ptr; 
     next_ptr->prev = prev_ptr;
 
     munmap(p,num_pages_to_delete);
 
-    //TODO: Do we delete the data after program exits?
 
 }
 
@@ -305,6 +317,7 @@ void* smalloc (size_t size) {
     MallocMetadata* new_metadata = nullptr;
     void* new_data = nullptr;
     MallocMetadata* ptr = nullptr;
+    MallocMetadata* last_block = nullptr;
 
     bool is_mmap = false;
     if (size >= MIN_MMAP_SIZE) {
@@ -325,25 +338,32 @@ void* smalloc (size_t size) {
                 _split(ptr, size);
             }
             _mark_used(ptr);
-            ptr += data.size_of_meta_data;
+            ptr += data.size_of_meta_data; //TODO: check
             return ptr;
         }
         else {
+            last_block = ptr;
             ptr = ptr->next;
         }
     }
 
     //Wilderness territory
     size_t diff = 0;
-    if(data.num_of_allocated_blocks > 0 && ptr->is_free) {
-        MallocMetadata* biggest_block_meta = _get_metadata(ptr);
-        MallocMetadata* meta_pointer = biggest_block_meta++;
-        void* old_biggest_block_start = (void*)(meta_pointer); // TODO: Does this work?
-        diff = size - ptr->size;
+    if(data.num_of_allocated_blocks > 0 && last_block->is_free) {
+        MallocMetadata* biggest_block_meta = _get_metadata(last_block);
+        void* old_biggest_block_start = _get_data_after_metadata(biggest_block_meta);
+
+        diff = size - last_block->size;
         void* temp = _aux_smalloc(diff);
+
         biggest_block_meta->is_free = false;
         biggest_block_meta->next = nullptr;
         biggest_block_meta->size = size;
+
+        //Update data
+        data.num_of_free_bytes -= size;
+        data.num_of_free_blocks--;
+        data.num_of_allocated_bytes += diff;
         return old_biggest_block_start;      
     }
 
@@ -361,13 +381,13 @@ void* smalloc (size_t size) {
                         data_size_in_pages + metadata_size_in_pages, 
                         PROT_WRITE | PROT_READ, 
                         MAP_ANONYMOUS | MAP_PRIVATE,
-                        0,
+                        -1,
                         0);
         new_metadata = (MallocMetadata*)temp_ptr;
-        new_data = static_cast<char*>(temp_ptr) + data.size_of_meta_data; //TODO: Maybe reinterpert_cast?
+        new_data = _get_data_after_metadata(new_metadata);
 
         _add_allocation(new_metadata, (MallocMetadata*)heap_mmap);
-    } else {        //sbrk list
+    } else {        //heap/sbrk list
         new_metadata = (MallocMetadata*)_aux_smalloc(sizeof(MallocMetadata));
         new_data = _aux_smalloc(size);
         _add_allocation(new_metadata, (MallocMetadata*)heap_sbrk);
@@ -403,8 +423,9 @@ void sfree(void* p) {
     if(is_mmap) {
         _remove_from_mmap_list(p);
     } else {
-        _merge_adjacent_blocks(p);
         _mark_free(p_metadata);
+        _merge_adjacent_blocks(p);
+        
     }   
 }
 
@@ -415,10 +436,17 @@ void* srealloc(void* oldp, size_t size) {
     MallocMetadata* oldp_metadata = _get_metadata(oldp);
     if (oldp_metadata->size >= size) return oldp;
 
+
+    //First check if can be merged with neighbors and realloc there.
+    //Second, if cant then a) Merge and free the current block b) Find a large enough block for the request
+    //Third, copy all data to new location.
+
+
+
     void* ptr = smalloc(size);
 
-    if (ptr != nullptr) {
-        memcpy(ptr, oldp, oldp_metadata->size);
+    if (ptr != nullptr) { 
+        memcpy(ptr, oldp, oldp_metadata->size); 
         sfree(oldp);    
     }
 
