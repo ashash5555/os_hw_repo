@@ -84,7 +84,7 @@
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="/home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp">
+		<Unit filename="/home/student/Desktop/OS_HW/os_hw_repo/hw4/tests/malloc_test.cpp">
 			<Option target="hw4"/>
 		</Unit>
 		<Unit filename="/home/student/Desktop/OS_HW/os_hw_repo/hw4/CMakeLists.txt">

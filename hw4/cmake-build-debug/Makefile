@@ -123,32 +123,32 @@ hw4/fast:
 	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/build
 .PHONY : hw4/fast
 
-test_realloc.o: test_realloc.cpp.o
+tests/malloc_test.o: tests/malloc_test.cpp.o
 
-.PHONY : test_realloc.o
+.PHONY : tests/malloc_test.o
 
 # target to build an object file
-test_realloc.cpp.o:
-	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/test_realloc.cpp.o
-.PHONY : test_realloc.cpp.o
+tests/malloc_test.cpp.o:
+	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/tests/malloc_test.cpp.o
+.PHONY : tests/malloc_test.cpp.o
 
-test_realloc.i: test_realloc.cpp.i
+tests/malloc_test.i: tests/malloc_test.cpp.i
 
-.PHONY : test_realloc.i
+.PHONY : tests/malloc_test.i
 
 # target to preprocess a source file
-test_realloc.cpp.i:
-	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/test_realloc.cpp.i
-.PHONY : test_realloc.cpp.i
+tests/malloc_test.cpp.i:
+	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/tests/malloc_test.cpp.i
+.PHONY : tests/malloc_test.cpp.i
 
-test_realloc.s: test_realloc.cpp.s
+tests/malloc_test.s: tests/malloc_test.cpp.s
 
-.PHONY : test_realloc.s
+.PHONY : tests/malloc_test.s
 
 # target to generate assembly for a file
-test_realloc.cpp.s:
-	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/test_realloc.cpp.s
-.PHONY : test_realloc.cpp.s
+tests/malloc_test.cpp.s:
+	$(MAKE) -f CMakeFiles/hw4.dir/build.make CMakeFiles/hw4.dir/tests/malloc_test.cpp.s
+.PHONY : tests/malloc_test.cpp.s
 
 # Help Target
 help:
@@ -159,9 +159,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... hw4"
 	@echo "... edit_cache"
-	@echo "... test_realloc.o"
-	@echo "... test_realloc.i"
-	@echo "... test_realloc.s"
+	@echo "... tests/malloc_test.o"
+	@echo "... tests/malloc_test.i"
+	@echo "... tests/malloc_test.s"
 .PHONY : help
 
 

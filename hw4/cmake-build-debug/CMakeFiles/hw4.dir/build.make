@@ -57,27 +57,27 @@ include CMakeFiles/hw4.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/hw4.dir/flags.make
 
-CMakeFiles/hw4.dir/test_realloc.cpp.o: CMakeFiles/hw4.dir/flags.make
-CMakeFiles/hw4.dir/test_realloc.cpp.o: ../test_realloc.cpp
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/student/Desktop/OS_HW/os_hw_repo/hw4/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/hw4.dir/test_realloc.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/hw4.dir/test_realloc.cpp.o -c /home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp
+CMakeFiles/hw4.dir/tests/malloc_test.cpp.o: CMakeFiles/hw4.dir/flags.make
+CMakeFiles/hw4.dir/tests/malloc_test.cpp.o: ../tests/malloc_test.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/student/Desktop/OS_HW/os_hw_repo/hw4/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/hw4.dir/tests/malloc_test.cpp.o"
+	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/hw4.dir/tests/malloc_test.cpp.o -c /home/student/Desktop/OS_HW/os_hw_repo/hw4/tests/malloc_test.cpp
 
-CMakeFiles/hw4.dir/test_realloc.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/hw4.dir/test_realloc.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp > CMakeFiles/hw4.dir/test_realloc.cpp.i
+CMakeFiles/hw4.dir/tests/malloc_test.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/hw4.dir/tests/malloc_test.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/student/Desktop/OS_HW/os_hw_repo/hw4/tests/malloc_test.cpp > CMakeFiles/hw4.dir/tests/malloc_test.cpp.i
 
-CMakeFiles/hw4.dir/test_realloc.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/hw4.dir/test_realloc.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp -o CMakeFiles/hw4.dir/test_realloc.cpp.s
+CMakeFiles/hw4.dir/tests/malloc_test.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/hw4.dir/tests/malloc_test.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/student/Desktop/OS_HW/os_hw_repo/hw4/tests/malloc_test.cpp -o CMakeFiles/hw4.dir/tests/malloc_test.cpp.s
 
 # Object files for target hw4
 hw4_OBJECTS = \
-"CMakeFiles/hw4.dir/test_realloc.cpp.o"
+"CMakeFiles/hw4.dir/tests/malloc_test.cpp.o"
 
 # External object files for target hw4
 hw4_EXTERNAL_OBJECTS =
 
-hw4: CMakeFiles/hw4.dir/test_realloc.cpp.o
+hw4: CMakeFiles/hw4.dir/tests/malloc_test.cpp.o
 hw4: CMakeFiles/hw4.dir/build.make
 hw4: CMakeFiles/hw4.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/student/Desktop/OS_HW/os_hw_repo/hw4/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable hw4"

@@ -1,1 +1,1 @@
-/usr/bin/c++   --std=c++11 -Wall -pedantic -Werror -fPIC -g   CMakeFiles/hw4.dir/test_realloc.cpp.o  -o hw4 
+/usr/bin/c++   --std=c++11 -g   CMakeFiles/hw4.dir/tests/malloc_test.cpp.o  -o hw4 

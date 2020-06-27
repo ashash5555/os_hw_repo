@@ -22,13 +22,13 @@ sys/mman.h
 math.h
 -
 
-/home/student/Desktop/OS_HW/os_hw_repo/hw4/test_realloc.cpp
+/home/student/Desktop/OS_HW/os_hw_repo/hw4/tests/malloc_test.cpp
 cstdio
 -
-cassert
+assert.h
 -
-malloc_2.cpp
+../malloc_2.cpp
 /home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_2.cpp
-malloc_3.cpp
+../malloc_3.cpp
 /home/student/Desktop/OS_HW/os_hw_repo/hw4/malloc_3.cpp
 

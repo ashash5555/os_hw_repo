@@ -7,13 +7,13 @@
 /** Run the test 4 times, and each time change the _TEST_NUMBER definition.
  * _TEST_NUMBER should be: 1 or 2 or 3 or 4.
  */
-#define _TEST_NUMBER 2
+#define _TEST_NUMBER 3
 
 
 #if (1 == _TEST_NUMBER)
-#include "malloc_2.cpp"
+#include "../malloc_2.cpp"
 #else
-#include "malloc_3.cpp"
+#include "../malloc_3.cpp"
 #endif
 
 void malloc2_test_01() {
@@ -220,7 +220,7 @@ void malloc3_test_02() {
         if (i != 5 && i != 8) sfree(tens[i]);
     }
     // order: free(280+6*data), 80, free(190+data)
-    assert(_num_free_blocks() == 2);
+    assert(_num_free_blocks() == 2);    /// <-- I think it can happen only if not sorted
     assert(_num_free_bytes() ==
            sizeof(long long) * 470 + 7 * _size_meta_data());
     assert(_num_allocated_blocks() == 3);

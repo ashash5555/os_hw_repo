@@ -6,47 +6,47 @@ int main() {
  //   global_list_init = NULL; init of global list.
  //   global_list = NULL;
 
-    assert(malloc(0) == NULL);
-    assert(malloc(MAX_MALLOC_SIZE + 1) == NULL);
+    assert(smalloc(0) == NULL);
+    assert(smalloc(MAX_MALLOC_SIZE + 1) == NULL);
 
     // allocate 6 big blocks
     void *b1, *b2, *b3, *b4, *b5, *b6, *b7, *b8, *b9;
-    b1 = malloc(1000);
+    b1 = smalloc(1000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 1);
     assert(_num_allocated_bytes() == 1000);
     assert(_num_meta_data_bytes() == META_SIZE);
 
-    b2 = malloc(2000);
+    b2 = smalloc(2000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 2);
     assert(_num_allocated_bytes() == 3000);
     assert(_num_meta_data_bytes() == 2 * META_SIZE);
 
-    b3 = malloc(3000);
+    b3 = smalloc(3000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 3);
     assert(_num_allocated_bytes() == 6000);
     assert(_num_meta_data_bytes() == 3 * META_SIZE);
 
-    b4 = malloc(4000);
+    b4 = smalloc(4000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 4);
     assert(_num_allocated_bytes() == 10000);
     assert(_num_meta_data_bytes() == 4 * META_SIZE);
 
-    b5 = malloc(5000);
+    b5 = smalloc(5000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 5);
     assert(_num_allocated_bytes() == 15000);
     assert(_num_meta_data_bytes() == 5 * META_SIZE);
 
-    b6 = malloc(6000);
+    b6 = smalloc(6000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 6);
@@ -60,7 +60,7 @@ int main() {
     assert(_num_allocated_bytes() == 21000);
     assert(_num_meta_data_bytes() == 6 * META_SIZE);
 
-    b3 = malloc(1000);
+    b3 = smalloc(1000);
     assert(_num_free_blocks() == 1);
     assert(_num_free_bytes() == 3000 - META_SIZE - 1000);
     assert(_num_allocated_blocks() == 7);
@@ -86,7 +86,7 @@ int main() {
 
     // split will not work now, size is lower than 128 of data EXCLUDING the size of your meta-data structure.
     // the free block is of size 7000 + META_SIZE, so the splittable part is 127.
-    b3 = malloc(7000 - 127);
+    b3 = smalloc(7000 - 127);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 5);
@@ -103,7 +103,7 @@ int main() {
 
     // split will work now, size is 128 of data EXCLUDING the size of your meta-data structure.
     // the free block is of size 7000 + META_SIZE, so the splittable part is 127.
-    b3 = malloc(7000 - 128);
+    b3 = smalloc(7000 - 128);
     assert(_num_free_blocks() == 1);
     assert(_num_free_bytes() == 128);
     assert(_num_allocated_blocks() == 6);
@@ -119,7 +119,7 @@ int main() {
     assert(_num_meta_data_bytes() == 6 * META_SIZE);
 
     // should take the middle block of size 128.
-    b7 = malloc(128);
+    b7 = smalloc(128);
     assert(_num_free_blocks() == 1);
     assert(_num_free_bytes() == 6000);
     assert(_num_allocated_blocks() == 6);
@@ -127,7 +127,7 @@ int main() {
     assert(_num_meta_data_bytes() == 6 * META_SIZE);
 
     // should split wilderness block.
-    b6 = malloc(5000);
+    b6 = smalloc(5000);
     assert(_num_free_blocks() == 1);
     assert(_num_free_bytes() == 1000 - META_SIZE);
     assert(_num_allocated_blocks() == 7);
@@ -135,7 +135,7 @@ int main() {
     assert(_num_meta_data_bytes() == 7 * META_SIZE);
 
     // should enlarge wilderness block.
-    b8 = malloc(1000);
+    b8 = smalloc(1000);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 7);
@@ -143,7 +143,7 @@ int main() {
     assert(_num_meta_data_bytes() == 7 * META_SIZE);
 
     // add another block to the end.
-    b9 = malloc(10);
+    b9 = smalloc(10);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 8);
@@ -158,7 +158,7 @@ int main() {
     assert(_num_allocated_bytes() == 21012);
     assert(_num_meta_data_bytes() == 8 * META_SIZE);
 
-    b9 = malloc(8);
+    b9 = smalloc(8);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 8);
@@ -166,28 +166,28 @@ int main() {
     assert(_num_meta_data_bytes() == 8 * META_SIZE);
 
     // checking alignment
-    b9 = malloc(1);
+    b9 = smalloc(1);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 9);
     assert(_num_allocated_bytes() == 21016);
     assert(_num_meta_data_bytes() == 9 * META_SIZE);
 
-    b9 = malloc(2);
+    b9 = smalloc(2);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 10);
     assert(_num_allocated_bytes() == 21020);
     assert(_num_meta_data_bytes() == 10 * META_SIZE);
 
-    b9 = malloc(3);
+    b9 = smalloc(3);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 11);
     assert(_num_allocated_bytes() == 21024);
     assert(_num_meta_data_bytes() == 11 * META_SIZE);
 
-    b9 = malloc(4);
+    b9 = smalloc(4);
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 12);

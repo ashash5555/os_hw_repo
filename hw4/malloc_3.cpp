@@ -67,16 +67,16 @@ static void _mark_free(MallocMetadata* to_mark) {
     to_mark->is_free = true;
 
     /// update data
-    data.num_of_free_blocks++;
-    data.num_of_free_bytes += to_mark->size;
+//    data.num_of_free_blocks++;
+//    data.num_of_free_bytes += to_mark->size;
 }
 
 static void _mark_used(MallocMetadata* to_mark) {
     to_mark->is_free = false;
 
     /// update data
-    data.num_of_free_blocks--;
-    data.num_of_free_bytes -= to_mark->size;
+//    data.num_of_free_blocks--;
+//    data.num_of_free_bytes -= to_mark->size;
 }
 
 static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
@@ -126,9 +126,9 @@ static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
     }
 
     /// update data
-    data.num_of_allocated_blocks++;
-    data.num_of_allocated_bytes += to_add->size;
-    data.num_of_meta_data_bytes += data.size_of_meta_data;
+//    data.num_of_allocated_blocks++;
+//    data.num_of_allocated_bytes += to_add->size;
+//    data.num_of_meta_data_bytes += data.size_of_meta_data;
 }
 
 /// malloc from part 1
@@ -162,8 +162,19 @@ static void* _get_data_after_metadata(MallocMetadata* metadata) {
     return (void*)p;
 }
 
+void _reinsert(MallocMetadata* p_metadata) {
+    p_metadata->prev->next = p_metadata->next;
+    if(p_metadata->next) p_metadata->next->prev = p_metadata->prev;
+    p_metadata->next = nullptr;
+    p_metadata->prev = nullptr;
+    data.num_of_allocated_bytes -= p_metadata->size;
+    data.num_of_meta_data_bytes -= data.size_of_meta_data;
+    data.num_of_allocated_blocks--;
+    _add_allocation(p_metadata, (MallocMetadata*)heap_sbrk);
+}
+
 void _split(void* p, size_t size) {
-    MallocMetadata* p_metadata = _get_metadata(p);
+    MallocMetadata* p_metadata = (MallocMetadata*)p;
     size_t new_block_size = p_metadata->size - size;
     size_t offset = data.size_of_meta_data + size;
     MallocMetadata* new_metadata = (MallocMetadata*)(static_cast<char*>(p) + offset);
@@ -175,9 +186,12 @@ void _split(void* p, size_t size) {
     /// which head we need to send??? Roman: Only heap since mmap are deleted when freed so are never split
     /// 
     _add_allocation(new_metadata, (MallocMetadata*)heap_sbrk);
-    data.num_of_allocated_bytes -= new_metadata->size + data.size_of_meta_data;
-    data.num_of_free_bytes += new_metadata->size;
-    data.num_of_free_blocks++;
+
+//    data.num_of_allocated_bytes -= new_metadata->size + data.size_of_meta_data;
+//    data.num_of_free_bytes -= data.size_of_meta_data;
+//    data.num_of_free_blocks++;
+
+    _reinsert(p_metadata);
 }
 
 void* _merge_adjacent_blocks(void* p) {
@@ -185,6 +199,7 @@ void* _merge_adjacent_blocks(void* p) {
     MallocMetadata* prev_metadata = p_metadata->prev;
     MallocMetadata* next_metadata = p_metadata->next;
     void* return_ptr = nullptr;
+    MallocMetadata* return_ptr_metadata = nullptr;
 
     //Priority list for merging (detailed in srealloc)
     if (prev_metadata && next_metadata) { //Both sides available
@@ -193,33 +208,39 @@ void* _merge_adjacent_blocks(void* p) {
             prev_metadata->next = p_metadata->next;
             p_metadata->next->prev = prev_metadata;
             return_ptr = _get_data_after_metadata(prev_metadata);
+            return_ptr_metadata = prev_metadata;
 
-            data.num_of_allocated_blocks --;
-            data.num_of_free_blocks --;
-            data.num_of_free_bytes += p_metadata->size + data.size_of_meta_data;
-            data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//            data.num_of_allocated_blocks --;
+//            data.num_of_free_blocks --;
+//            data.num_of_free_bytes += data.size_of_meta_data;
+//            data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//            data.num_of_allocated_bytes += data.size_of_meta_data;
         }
         else if (!(prev_metadata->is_free) && next_metadata->is_free) { //Merge Next 2nd
             p_metadata->size += next_metadata->size + data.size_of_meta_data;
             p_metadata->next = next_metadata->next;
             p_metadata->next->prev = p_metadata;
             return_ptr = _get_data_after_metadata(p_metadata);
+            return_ptr_metadata = p_metadata;
 
-            data.num_of_allocated_blocks --;
-            data.num_of_free_blocks --;
-            data.num_of_free_bytes += next_metadata->size + data.size_of_meta_data;
-            data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//            data.num_of_allocated_blocks --;
+//            data.num_of_free_blocks --;
+//            data.num_of_free_bytes += data.size_of_meta_data;
+//            data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//            data.num_of_allocated_bytes += data.size_of_meta_data;
         }
         else if (prev_metadata->is_free && next_metadata->is_free) { //Merge both last
             prev_metadata->size += p_metadata->size + next_metadata->size + 2*data.size_of_meta_data;
             prev_metadata->next = next_metadata->next;
             if (next_metadata->next->prev) next_metadata->next->prev = prev_metadata;
             return_ptr = _get_data_after_metadata(prev_metadata);
+            return_ptr_metadata = prev_metadata;
 
-            data.num_of_allocated_blocks -= 2;
-            data.num_of_free_blocks -= 2;
-            data.num_of_free_bytes += p_metadata->size + 2*data.size_of_meta_data;
-            data.num_of_meta_data_bytes -= 2*data.size_of_meta_data;
+//            data.num_of_allocated_blocks -= 2;
+//            data.num_of_free_blocks -= 2;
+//            data.num_of_free_bytes += 2*data.size_of_meta_data;
+//            data.num_of_meta_data_bytes -= 2*data.size_of_meta_data;
+//            data.num_of_allocated_bytes += 2*data.size_of_meta_data;
         }
         
         else {
@@ -227,6 +248,7 @@ void* _merge_adjacent_blocks(void* p) {
             return_ptr = _get_data_after_metadata(p_metadata);
         }
 
+        if (return_ptr_metadata) _reinsert(return_ptr_metadata);
         return return_ptr;
     }
     //One sided checks
@@ -234,11 +256,13 @@ void* _merge_adjacent_blocks(void* p) {
         prev_metadata->size += p_metadata->size + data.size_of_meta_data;
         prev_metadata->next = p_metadata->next;
         return_ptr = _get_data_after_metadata(prev_metadata);
+        return_ptr_metadata = prev_metadata;
 
-        data.num_of_allocated_blocks --;
-        data.num_of_free_blocks --;
-        data.num_of_free_bytes += p_metadata->size + data.size_of_meta_data;
-        data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//        data.num_of_allocated_blocks --;
+//        data.num_of_free_blocks --;
+//        data.num_of_free_bytes += data.size_of_meta_data;
+//        data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//        data.num_of_allocated_bytes += data.size_of_meta_data;
     }
 
     else if (next_metadata && next_metadata->is_free && !prev_metadata) {
@@ -246,11 +270,13 @@ void* _merge_adjacent_blocks(void* p) {
         p_metadata->next = next_metadata->next;
         if (next_metadata->next) next_metadata->next->prev = p_metadata;
         return_ptr = _get_data_after_metadata(p_metadata);
+        return_ptr_metadata = p_metadata;
 
-        data.num_of_allocated_blocks --;
-        data.num_of_free_blocks --;
-        data.num_of_free_bytes += next_metadata->size + data.size_of_meta_data;
-        data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//        data.num_of_allocated_blocks --;
+//        data.num_of_free_blocks --;
+//        data.num_of_free_bytes += data.size_of_meta_data;
+//        data.num_of_meta_data_bytes -= data.size_of_meta_data;
+//        data.num_of_allocated_bytes += data.size_of_meta_data;
     }
 
     else {
@@ -258,6 +284,7 @@ void* _merge_adjacent_blocks(void* p) {
         return_ptr = _get_data_after_metadata(p_metadata);
     }
 
+    if (return_ptr_metadata) _reinsert(return_ptr_metadata);
     return return_ptr;
 }
 
@@ -267,8 +294,8 @@ void* _merge_adjacent_blocks(void* p) {
 bool _should_split(void* p, size_t want_to_alloc) {
 
     if (p == nullptr) return false;
-    MallocMetadata* metadata = _get_metadata(p);   
-    size_t curr_size = metadata->size;
+//    MallocMetadata* metadata = _get_metadata(p);
+    size_t curr_size = ((MallocMetadata*)p)->size;
     size_t metadata_size = data.size_of_meta_data; //TODO: check this again for measurments
     int remaining_size = 0;
 
@@ -305,15 +332,81 @@ void _remove_from_mmap_list(void* p){
 
 }
 
+bool _isWildernessChunk(MallocMetadata* p_metadata) {
+    void* end_heap = sbrk(0);
+    size_t offset = data.size_of_meta_data + p_metadata->size;
+    void* ptr = (static_cast<char*>((void*)p_metadata) + offset);
+    return (ptr == end_heap);
+}
+
  ///===========================================================================================///
 
+size_t _num_free_blocks() {
+    MallocMetadata* ptr = ((MallocMetadata*)heap_sbrk)->next;   /// skipping dummy
+    data.num_of_free_blocks = 0;
+    while (ptr) {
+        if (ptr->is_free) {
+            data.num_of_free_blocks++;
+        }
+        ptr = ptr->next;
+    }
+    /// storing in this var for debug
+    return data.num_of_free_blocks;
+}
+size_t  _num_free_bytes() {
+    MallocMetadata* ptr = ((MallocMetadata*)heap_sbrk)->next;   /// skipping dummy
+    data.num_of_free_bytes = 0;
+    while (ptr) {
+        if (ptr->is_free) {
+            data.num_of_free_bytes += ptr->size;
+        }
+        ptr = ptr->next;
+    }
+    /// storing in this var for debug
+    return data.num_of_free_bytes;
+}
 
-size_t _num_free_blocks() {return data.num_of_free_blocks;}
-size_t _num_free_bytes() {return data.num_of_free_bytes;}
-size_t _num_allocated_blocks() {return data.num_of_allocated_blocks;}
-size_t _num_allocated_bytes() {return data.num_of_allocated_bytes;}
+size_t _num_allocated_blocks() {
+    MallocMetadata* ptr = ((MallocMetadata*)heap_sbrk)->next;   /// skipping dummy
+    data.num_of_allocated_blocks = 0;
+    while (ptr) {
+        data.num_of_allocated_blocks++;
+        ptr = ptr->next;
+    }
+    /// storing in this var for debug
+    return data.num_of_allocated_blocks;
+}
+
+size_t _num_allocated_bytes() {
+    MallocMetadata* ptr = ((MallocMetadata*)heap_sbrk)->next;   /// skipping dummy
+    data.num_of_allocated_bytes = 0;
+    while (ptr) {
+        data.num_of_allocated_bytes += ptr->size;
+        ptr = ptr->next;
+    }
+    /// storing in this var for debug
+    return data.num_of_allocated_bytes;
+}
+
 size_t _size_meta_data() {return data.size_of_meta_data;}
-size_t _num_meta_data_bytes() {return data.num_of_meta_data_bytes;}
+
+size_t _num_meta_data_bytes() {
+    MallocMetadata* ptr = ((MallocMetadata*)heap_sbrk)->next;   /// skipping dummy
+    data.num_of_meta_data_bytes = 0;
+    while (ptr) {
+        data.num_of_meta_data_bytes += data.size_of_meta_data;
+        ptr = ptr->next;
+    }
+    /// storing in this var for debug
+    return data.num_of_meta_data_bytes;
+}
+
+//size_t _num_free_blocks() {return data.num_of_free_blocks;}
+//size_t _num_free_bytes() {return data.num_of_free_bytes;}
+//size_t _num_allocated_blocks() {return data.num_of_allocated_blocks;}
+//size_t _num_allocated_bytes() {return data.num_of_allocated_bytes;}
+//size_t _size_meta_data() {return data.size_of_meta_data;}
+//size_t _num_meta_data_bytes() {return data.num_of_meta_data_bytes;}
 
 void* smalloc (size_t size) {
     if (size == 0 || size > MAX_SIZE) return nullptr;
@@ -354,9 +447,7 @@ void* smalloc (size_t size) {
 
     //Wilderness territory
     size_t diff = 0;
-    if(data.num_of_allocated_blocks > 0 && last_block->is_free) {
-//        MallocMetadata* biggest_block_meta = _get_metadata(last_block);
-//        void* old_biggest_block_start = _get_data_after_metadata(biggest_block_meta);
+    if(data.num_of_allocated_blocks > 0 && last_block->is_free && _isWildernessChunk(last_block)) {
         void* old_biggest_block_start = _get_data_after_metadata(last_block);
 
         size_t  old_size = last_block->size;
@@ -364,18 +455,15 @@ void* smalloc (size_t size) {
 //        void* temp = _aux_smalloc(diff);  /// did not compile with this
         _aux_smalloc(diff);                 /// so changed to this
 
-//        biggest_block_meta->is_free = false;
-//        biggest_block_meta->next = nullptr;
-//        biggest_block_meta->size = size;
         last_block->is_free = false;
         last_block->next = nullptr;
         last_block->size = size;
 
         //Update data
-//        data.num_of_free_bytes -= size;
-        data.num_of_free_bytes -= old_size;
-        data.num_of_free_blocks--;
-        data.num_of_allocated_bytes += diff;
+
+//        data.num_of_free_bytes -= old_size;
+//        data.num_of_free_blocks--;
+//        data.num_of_allocated_bytes += diff;
         return old_biggest_block_start;      
     }
 
@@ -448,7 +536,7 @@ void* srealloc(void* oldp, size_t size) {
     MallocMetadata* oldp_metadata = _get_metadata(oldp);
     
     /// taking care of wilderness chunk
-    if (oldp_metadata->next == nullptr && !(oldp_metadata->is_mmapped) && oldp_metadata->size < size) {
+    if (oldp_metadata->next == nullptr && !(oldp_metadata->is_mmapped) && oldp_metadata->size < size && _isWildernessChunk(oldp_metadata)) {
         size_t diff = 0;
 
         diff = size - oldp_metadata->size;
@@ -458,7 +546,7 @@ void* srealloc(void* oldp, size_t size) {
         oldp_metadata->size = size;
 
         //Update data
-        data.num_of_allocated_bytes += diff;
+//        data.num_of_allocated_bytes += diff;
         return oldp;
     }
 
@@ -480,8 +568,8 @@ void* srealloc(void* oldp, size_t size) {
     
     // this is a fucking heap situation
     if (oldp_metadata->size >= size) {
-        if (_should_split(oldp, size)) {
-            _split(oldp, size);
+        if (_should_split(oldp_metadata, size)) {
+            _split(oldp_metadata, size);
         }
         return oldp;   /// reusing block
     }
@@ -522,3 +610,342 @@ void* srealloc(void* oldp, size_t size) {
 
     return ptr; 
 }
+
+///=========================================malloc_3_tests.cpp======================================================///
+//#define META_SIZE         sizeof(MallocMetadata) // put your meta data name here.
+//#define  MAX_MALLOC_SIZE 1e8
+//#include <assert.h>
+//
+//int main() {
+//
+//    //   global_list_init = NULL; init of global list.
+//    //   global_list = NULL;
+//
+//    assert(smalloc(0) == NULL);
+//    assert(smalloc(MAX_MALLOC_SIZE + 1) == NULL);
+//
+//    // allocate 6 big blocks
+//    void *b1, *b2, *b3, *b4, *b5, *b6, *b7, *b8, *b9;
+//    b1 = smalloc(1000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 1);
+//    assert(_num_allocated_bytes() == 1000);
+//    assert(_num_meta_data_bytes() == META_SIZE);
+//
+//    b2 = smalloc(2000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 3000);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    b3 = smalloc(3000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 3);
+//    assert(_num_allocated_bytes() == 6000);
+//    assert(_num_meta_data_bytes() == 3 * META_SIZE);
+//
+//    b4 = smalloc(4000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 10000);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    b5 = smalloc(5000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 5);
+//    assert(_num_allocated_bytes() == 15000);
+//    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+//
+//    b6 = smalloc(6000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    sfree(b3);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 3000);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    b3 = smalloc(1000);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 3000 - META_SIZE - 1000);
+//    assert(_num_allocated_blocks() == 7);
+//    assert(_num_allocated_bytes() == 21000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 7 * META_SIZE);
+//
+//    // free of b3 will combine two free blocks back together.
+//    sfree(b3);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 3000);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    // checking if free combine works on the other way.
+//    // (a a f a a a /free b4/ a a f f a a /combine b3 and b4/ a a f a a)
+//    sfree(b4);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 7000 + META_SIZE);
+//    assert(_num_allocated_blocks() == 5);
+//    assert(_num_allocated_bytes() == 21000 + META_SIZE);
+//    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+//
+//    // split will not work now, size is lower than 128 of data EXCLUDING the size of your meta-data structure.
+//    // the free block is of size 7000 + META_SIZE, so the splittable part is 127.
+//    b3 = smalloc(7000 - 127);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 5);
+//    assert(_num_allocated_bytes() == 21000 + META_SIZE);
+//    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+//
+//    // free will work and combine.
+//    sfree(b3);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 7000 + META_SIZE);
+//    assert(_num_allocated_blocks() == 5);
+//    assert(_num_allocated_bytes() == 21000 + META_SIZE);
+//    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+//
+//    // split will work now, size is 128 of data EXCLUDING the size of your meta-data structure.
+//    // the free block is of size 7000 + META_SIZE, so the splittable part is 127.
+//    b3 = smalloc(7000 - 128);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 128);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    // checking wilderness chunk
+//    sfree(b6);
+//    assert(_num_free_blocks() == 2);
+//    assert(_num_free_bytes() == 128 + 6000);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    // should take the middle block of size 128.
+//    b7 = smalloc(128);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 6000);
+//    assert(_num_allocated_blocks() == 6);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 6 * META_SIZE);
+//
+//    // should split wilderness block.   /// <-- I think this is not true so it makes problems from now on....
+//    b6 = smalloc(5000);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 1000 - META_SIZE);
+//    assert(_num_allocated_blocks() == 7);
+//    assert(_num_allocated_bytes() == 21000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 7 * META_SIZE);
+//
+//    // should enlarge wilderness block.
+//    b8 = smalloc(1000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 7);
+//    assert(_num_allocated_bytes() == 21000);
+//    assert(_num_meta_data_bytes() == 7 * META_SIZE);
+//
+//    // add another block to the end.
+//    b9 = smalloc(10);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 8);
+//    assert(_num_allocated_bytes() == 21012);
+//    assert(_num_meta_data_bytes() == 8 * META_SIZE);
+//
+//    //
+//    sfree(b9);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 12);
+//    assert(_num_allocated_blocks() == 8);
+//    assert(_num_allocated_bytes() == 21012);
+//    assert(_num_meta_data_bytes() == 8 * META_SIZE);
+//
+//    b9 = smalloc(8);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 8);
+//    assert(_num_allocated_bytes() == 21012);
+//    assert(_num_meta_data_bytes() == 8 * META_SIZE);
+//
+//    // checking alignment
+//    b9 = smalloc(1);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 9);
+//    assert(_num_allocated_bytes() == 21016);
+//    assert(_num_meta_data_bytes() == 9 * META_SIZE);
+//
+//    b9 = smalloc(2);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 10);
+//    assert(_num_allocated_bytes() == 21020);
+//    assert(_num_meta_data_bytes() == 10 * META_SIZE);
+//
+//    b9 = smalloc(3);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 11);
+//    assert(_num_allocated_bytes() == 21024);
+//    assert(_num_meta_data_bytes() == 11 * META_SIZE);
+//
+//    b9 = smalloc(4);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 12);
+//    assert(_num_allocated_bytes() == 21028);
+//    assert(_num_meta_data_bytes() == 12 * META_SIZE);
+//
+//    return 0;
+//}
+///==================================================================================================================///
+
+///=========================================malloc_3_tests_realloc.cpp===============================================///
+//#include <cstdio>
+//#include <assert.h>
+//
+//#define META_SIZE         data.size_of_meta_data // put your meta data name here.
+//
+//int main() {
+//
+//    //   global_list_init = NULL; init of global list.
+//    //   global_list = NULL;
+//
+//    // allocate blocks
+//    void *b1, *b2, *b3, *b4, *b5, *b6, *b7, *b8, *b9, *b10, *b11, *b12, *b13, *b14 ,*b15;
+//
+//    // allocate first block, heap: b1(1000)
+//    b1 = smalloc(1000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 1);
+//    assert(_num_allocated_bytes() == 1000);
+//    assert(_num_meta_data_bytes() == META_SIZE);
+//
+//    // check realloc with NULL, heap: 1000(no_free), 2000(not_free)
+//    b2 = srealloc(NULL, 2000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 3000);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    // check realloc with same size, should return the same block, heap: 1000(no_free), 2000(not_free)
+//    b3 = srealloc(b2, 2000);
+//    assert(b2 == b3);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 3000);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    // check realloc with bigger size on wilderness block, heap: 1000(no_free), 3000(not_free)
+//    b4 = srealloc(b2, 3000);
+//    assert(b2 == b4);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 4000);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    // check realloc for smaller size and not enough space for split, heap: 1000(no_free), 3000(not_free)
+//    b5 = srealloc(b1, 900);
+//    assert(b1 == b5);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 4000);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    // heap: 1000(no_free), 3000(not_free), 2000(not_free)
+//    b6 = smalloc(2000);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 3);
+//    assert(_num_allocated_bytes() == 6000);
+//    assert(_num_meta_data_bytes() == 3 * META_SIZE);
+//
+//    // check realloc for smaller size and enough space for split
+//    // heap: 1000(no_free), 1000(not_free), 2000 - META_SIZE(free), 2000(not_free)
+//    b7 = srealloc(b2, 1000);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 2000 - META_SIZE);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 6000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    // check realloc for smaller size and enough space for split, after that merge with upper free block
+//    // heap: 1000(no_free), 500(not_free), 2500 - META_SIZE(free), 2000(not_free)
+//    b8 = srealloc(b7, 500);     /// <-- do we really need to merge here???
+/////                                             instructions says "marked free and added to the list" and not merge...
+/////                                             it only says thar sfree is merging...
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 2500 - META_SIZE);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 6000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    // check realloc for bigger size, upper block is free and enough space for split
+//    // heap: 1000(no_free), 1000(not_free), 2000 - META_SIZE(free), 2000(not_free)
+//    b9 = srealloc(b8, 1000);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 2000 - META_SIZE);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 6000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    // check realloc for bigger size, upper block is free and not enough space for split
+//    // heap: 1000(no_free), 3000(not_free), 2000(not_free)
+//    b10 = realloc(b9, 3000);
+//    assert(b10 == b9);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 3);
+//    assert(_num_allocated_bytes() == 6000);
+//    assert(_num_meta_data_bytes() == 3 * META_SIZE);
+//
+//    // check realloc for bigger size, upper block is free and lower block is free and size requested fits the 3 blocks merged
+//    // heap: 1000(no_free), 1000(not_free), 2000 - META_SIZE(free), 2000(not_free)
+//    b11 = srealloc(b10, 1000);
+//    assert(_num_free_blocks() == 1);
+//    assert(_num_free_bytes() == 2000 - META_SIZE);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 6000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    // heap: 1000(free), 1000(not_free), 2000 - META_SIZE(free), 2000(not_free)
+//    sfree(b1);
+//    assert(_num_free_blocks() == 2);
+//    assert(_num_free_bytes() == 3000 - META_SIZE);
+//    assert(_num_allocated_blocks() == 4);
+//    assert(_num_allocated_bytes() == 6000 - META_SIZE);
+//    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+//
+//    // heap: 4000 + META_SIZE(not_free), 2000(not_free)
+//    b12 = srealloc(b10, 4000);
+//    assert(b12 == b1);
+//    assert(_num_free_blocks() == 0);
+//    assert(_num_free_bytes() == 0);
+//    assert(_num_allocated_blocks() == 2);
+//    assert(_num_allocated_bytes() == 6000 + META_SIZE);
+//    assert(_num_meta_data_bytes() == 2 * META_SIZE);
+//
+//    printf("GOOD JOB!\n");
+//
+//    return 0;
+//}
+
+///==================================================================================================================///
