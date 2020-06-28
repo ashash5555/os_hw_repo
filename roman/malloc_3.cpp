@@ -22,6 +22,8 @@ struct MallocMetadata
     bool is_mmapped;
     MallocMetadata* next;
     MallocMetadata* prev;
+    MallocMetadata* next_on_heap;
+    MallocMetadata* prev_on_heap;
 };
 
 
@@ -49,6 +51,8 @@ static void* _get_dummy_sbrk_allocs() {
     dummy->is_mmapped = false;
     dummy->next = nullptr;
     dummy->prev = nullptr;
+    dummy->next_on_heap = nullptr;
+    dummy->prev_on_heap = nullptr;
 
     return dummy;
 }
@@ -66,6 +70,7 @@ static void* _get_dummy_mmap_allocs() {
 
 static void* heap_sbrk = _get_dummy_sbrk_allocs();
 static void* heap_mmap = _get_dummy_mmap_allocs();
+static MallocMetadata* tail = (MallocMetadata*)_get_dummy_sbrk_allocs();
 ///=======================================Aux functions=======================================///
 static void _mark_free(MallocMetadata* to_mark) {
     if (to_mark->is_free) return;
@@ -83,6 +88,7 @@ static void _mark_used(MallocMetadata* to_mark) {
 //    data.num_of_free_blocks--;
 //    data.num_of_free_bytes -= to_mark->size;
 }
+
 
 static void _add_allocation(MallocMetadata* to_add, MallocMetadata* head) {
     MallocMetadata* ptr = head;
@@ -160,9 +166,35 @@ static void* _aux_smalloc(size_t size) {
     return curr_brk;
 }
 
+static void _unlink_on_sort(MallocMetadata* p_metadata) {
+    p_metadata->prev->next = p_metadata->next;
+    if(p_metadata->next) p_metadata->next->prev = p_metadata->prev;
+    p_metadata->next = nullptr;
+    p_metadata->prev = nullptr;
+}
 static MallocMetadata* _get_metadata(void* p) {
     MallocMetadata* p_metadata = (MallocMetadata*)(static_cast<char*>(p) - data.size_of_meta_data);
     return p_metadata;
+}
+
+static bool _check_list_link(void* start) {
+    MallocMetadata* ptr = (MallocMetadata*)start;
+    MallocMetadata* last_ptr = nullptr;
+    while ((ptr)){
+        if (ptr == tail) {
+            return true;
+        } else if (ptr > ptr->next_on_heap) {
+            return false;
+        } else if (ptr < ptr->prev_on_heap) {
+            return false;
+        } else {
+            last_ptr = ptr;
+            ptr = ptr->next_on_heap;
+        }
+    }
+
+    return true;
+    
 }
 
 static void* _get_data_after_metadata(MallocMetadata* metadata) {
@@ -172,8 +204,8 @@ static void* _get_data_after_metadata(MallocMetadata* metadata) {
 }
 
 void _reinsert(MallocMetadata* p_metadata) {
-    p_metadata->prev->next = p_metadata->next;
-    if(p_metadata->next) p_metadata->next->prev = p_metadata->prev;
+    //p_metadata->prev->next = p_metadata->next;
+    //if(p_metadata->next) p_metadata->next->prev = p_metadata->prev;
     p_metadata->next = nullptr;
     p_metadata->prev = nullptr;
     //data.num_of_allocated_bytes -= p_metadata->size;
@@ -190,6 +222,11 @@ void _split(void* p, size_t size) {
     new_metadata->size = new_block_size - data.size_of_meta_data;
     new_metadata->is_free = true;
     new_metadata->is_mmapped = false;
+
+    //Heap list link
+    new_metadata->next_on_heap = p_metadata->next_on_heap;
+    new_metadata->prev_on_heap = p_metadata;
+    p_metadata->next_on_heap = new_metadata;
     p_metadata->size = size;
 
     /// which head we need to send??? Roman: Only heap since mmap are deleted when freed so are never split
@@ -199,25 +236,36 @@ void _split(void* p, size_t size) {
 //    data.num_of_allocated_bytes -= new_metadata->size + data.size_of_meta_data;
 //    data.num_of_free_bytes -= data.size_of_meta_data;
 //    data.num_of_free_blocks++;
-
+    _unlink_on_sort(p_metadata);
     _reinsert(p_metadata);
 }
 
 void* _merge_adjacent_blocks(void* p) {
     MallocMetadata* p_metadata = _get_metadata(p);
-    MallocMetadata* prev_metadata = p_metadata->prev;
-    MallocMetadata* next_metadata = p_metadata->next;
+    MallocMetadata* prev_metadata_on_heap = p_metadata->prev_on_heap;
+    MallocMetadata* next_metadata_on_heap = p_metadata->next_on_heap;
+    MallocMetadata* next_metadata_on_sort = p_metadata->next;
+    MallocMetadata* prev_metadata_on_sort = p_metadata->prev;
     void* return_ptr = nullptr;
     MallocMetadata* return_ptr_metadata = nullptr;
 
+    //Calculate offsets
+    
+
     //Priority list for merging (detailed in srealloc)
-    if (prev_metadata && next_metadata) { //Both sides available
-        if (prev_metadata->is_free && !(next_metadata->is_free)) {//Merge Prev 1st
-            prev_metadata->size += p_metadata->size + data.size_of_meta_data;
-            prev_metadata->next = p_metadata->next;
-            p_metadata->next->prev = prev_metadata;
-            return_ptr = _get_data_after_metadata(prev_metadata);
-            return_ptr_metadata = prev_metadata;
+    if (prev_metadata_on_heap && next_metadata_on_heap) { //Both sides available
+        if (prev_metadata_on_heap->is_free && !(next_metadata_on_heap->is_free)) {//Merge Prev 1st
+            prev_metadata_on_heap->size += p_metadata->size + data.size_of_meta_data;
+            //On heap link
+            prev_metadata_on_heap->next_on_heap = p_metadata->next_on_heap;
+            next_metadata_on_heap->prev_on_heap = prev_metadata_on_heap;
+            //List Unlinks 
+            //Unlink p_metadata
+            return_ptr_metadata = prev_metadata_on_heap;
+            _unlink_on_sort(prev_metadata_on_heap);
+            _unlink_on_sort(p_metadata);
+            return_ptr = _get_data_after_metadata(return_ptr_metadata);
+            
 
 //            data.num_of_allocated_blocks --;
 //            data.num_of_free_blocks --;
@@ -225,14 +273,18 @@ void* _merge_adjacent_blocks(void* p) {
 //            data.num_of_meta_data_bytes -= data.size_of_meta_data;
 //            data.num_of_allocated_bytes += data.size_of_meta_data;
         }
-        else if (!(prev_metadata->is_free) && next_metadata->is_free) { //Merge Next 2nd
-            p_metadata->size += next_metadata->size + data.size_of_meta_data;
-            p_metadata->next = next_metadata->next;
-            if(p_metadata->next) {
-                p_metadata->next->prev = p_metadata;
+        else if (!(prev_metadata_on_heap->is_free) && next_metadata_on_heap->is_free) { //Merge Next 2nd
+            p_metadata->size += next_metadata_on_heap->size + data.size_of_meta_data;
+            //On heap link
+            p_metadata->next_on_heap = next_metadata_on_heap->next_on_heap;
+            if(next_metadata_on_heap->next_on_heap) {
+                next_metadata_on_heap->next_on_heap->prev_on_heap = p_metadata;
             }
-            return_ptr = _get_data_after_metadata(p_metadata);
+            //Unlink next on sort
             return_ptr_metadata = p_metadata;
+            _unlink_on_sort(p_metadata);
+            _unlink_on_sort(next_metadata_on_heap);
+            return_ptr = _get_data_after_metadata(return_ptr_metadata);
 
 //            data.num_of_allocated_blocks --;
 //            data.num_of_free_blocks --;
@@ -240,12 +292,20 @@ void* _merge_adjacent_blocks(void* p) {
 //            data.num_of_meta_data_bytes -= data.size_of_meta_data;
 //            data.num_of_allocated_bytes += data.size_of_meta_data;
         }
-        else if (prev_metadata->is_free && next_metadata->is_free) { //Merge both last
-            prev_metadata->size += p_metadata->size + next_metadata->size + 2*data.size_of_meta_data;
-            prev_metadata->next = next_metadata->next;
-            if (next_metadata->next->prev) next_metadata->next->prev = prev_metadata;
-            return_ptr = _get_data_after_metadata(prev_metadata);
-            return_ptr_metadata = prev_metadata;
+        else if (prev_metadata_on_heap->is_free && next_metadata_on_heap->is_free) { //Merge both last
+            prev_metadata_on_heap->size += p_metadata->size + next_metadata_on_heap->size + 2*data.size_of_meta_data;
+            //On heap link
+            prev_metadata_on_heap->next_on_heap = next_metadata_on_heap->next_on_heap;
+            if(next_metadata_on_heap->next_on_heap) {
+                next_metadata_on_heap->next_on_heap->prev_on_heap = prev_metadata_on_heap;
+            }
+            //Unlink on sort
+            return_ptr_metadata = prev_metadata_on_heap;
+            _unlink_on_sort(prev_metadata_on_heap);
+            _unlink_on_sort(p_metadata);
+            _unlink_on_sort(next_metadata_on_heap);
+            return_ptr = _get_data_after_metadata(return_ptr_metadata);
+            
 
 //            data.num_of_allocated_blocks -= 2;
 //            data.num_of_free_blocks -= 2;
@@ -263,11 +323,15 @@ void* _merge_adjacent_blocks(void* p) {
         return return_ptr;
     }
     //One sided checks
-    else if (prev_metadata && prev_metadata->is_free && !next_metadata) {
-        prev_metadata->size += p_metadata->size + data.size_of_meta_data;
-        prev_metadata->next = p_metadata->next;
-        return_ptr = _get_data_after_metadata(prev_metadata);
-        return_ptr_metadata = prev_metadata;
+    else if (prev_metadata_on_heap && prev_metadata_on_heap->is_free && !next_metadata_on_heap) {
+        prev_metadata_on_heap->size += p_metadata->size + data.size_of_meta_data;
+        prev_metadata_on_heap->next_on_heap = next_metadata_on_heap;
+        //Unlink on sort
+        return_ptr_metadata = prev_metadata_on_heap;
+        _unlink_on_sort(prev_metadata_on_heap);
+        _unlink_on_sort(p_metadata);
+        return_ptr = _get_data_after_metadata(return_ptr_metadata);
+        
 
 //        data.num_of_allocated_blocks --;
 //        data.num_of_free_blocks --;
@@ -276,12 +340,17 @@ void* _merge_adjacent_blocks(void* p) {
 //        data.num_of_allocated_bytes += data.size_of_meta_data;
     }
 
-    else if (next_metadata && next_metadata->is_free && !prev_metadata) {
-        p_metadata->size += next_metadata->size + data.size_of_meta_data;
-        p_metadata->next = next_metadata->next;
-        if (next_metadata->next) next_metadata->next->prev = p_metadata;
-        return_ptr = _get_data_after_metadata(p_metadata);
+    else if (next_metadata_on_heap && next_metadata_on_heap->is_free && !prev_metadata_on_heap) {
+        p_metadata->size += next_metadata_on_heap->size + data.size_of_meta_data;
+        p_metadata->next_on_heap = next_metadata_on_heap->next_on_heap;
+        if (next_metadata_on_heap->next_on_heap) next_metadata_on_heap->next_on_heap->prev_on_heap = p_metadata;
+
+        //Unlink on sort
         return_ptr_metadata = p_metadata;
+        _unlink_on_sort(p_metadata);
+        _unlink_on_sort(next_metadata_on_heap);
+        return_ptr = _get_data_after_metadata(return_ptr_metadata);
+        
 
 //        data.num_of_allocated_blocks --;
 //        data.num_of_free_blocks --;
@@ -329,10 +398,6 @@ void _remove_from_mmap_list(void* p){
 //    MallocMetadata* temp = nullptr;   /// did not compile with this
     MallocMetadata* prev_ptr = metadata->prev; //prev->p->next
     MallocMetadata* next_ptr = metadata->next;
-
-    //int page_size = getpagesize();
-    //int num_pages_to_delete = _calc_mmap_size(metadata->size + data.size_of_meta_data);
-    //num_pages_to_delete = num_pages_to_delete * page_size; // num*4096
 
 //    temp  = metadata; //for testing   /// did not compile with this
 
@@ -467,10 +532,8 @@ void* smalloc (size_t size) {
                 _split(ptr, size);
             }
             _mark_used(ptr);
-            // ptr += data.size_of_meta_data; //TODO: check
             void* new_ptr = _get_data_after_metadata(ptr);
             return new_ptr;
-            // return ptr;
         }
         else {
             last_block = ptr;
@@ -495,11 +558,6 @@ void* smalloc (size_t size) {
         last_block->next = nullptr;
         last_block->size = size;
 
-        //Update data
-
-//        data.num_of_free_bytes -= old_size;
-//        data.num_of_free_blocks--;
-//        data.num_of_allocated_bytes += diff;
         return old_biggest_block_start;      
     }
 
@@ -527,6 +585,10 @@ void* smalloc (size_t size) {
         _add_allocation(new_metadata, (MallocMetadata*)heap_mmap);
     } else {        //heap/sbrk list
         new_metadata = (MallocMetadata*)_aux_smalloc(data.size_of_meta_data);
+        tail->next_on_heap = new_metadata;
+        new_metadata->prev_on_heap = tail;
+        new_metadata->next_on_heap = nullptr;
+        tail = new_metadata;
         new_data = _aux_smalloc(size);
         new_metadata->size = size;
         new_metadata->is_free = false;
@@ -628,6 +690,7 @@ void* srealloc(void* oldp, size_t size) {
         
         if (ptr != nullptr) {
             memmove(ptr, oldp, size);
+            std::cout << "good job!" << std::endl;
             new_metadata->is_free = false;
             sfree(oldp);
         }
@@ -1041,18 +1104,98 @@ int main() {
     p3 = smalloc(1000);
     p4 = scalloc(500,2);
     p5 = scalloc(2, 500);
+    assert(_check_list_link(heap_sbrk + 96));
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
     assert(_num_allocated_blocks() == 5);
     assert(_num_allocated_bytes() == 5000);
     assert(_num_meta_data_bytes() == 5 * META_SIZE);
     //check free, combine and split
-    sfree(p3); sfree(p5); sfree(p4);
-    p3 = smalloc(1000); p4 = smalloc(1000); p5 = smalloc (1000);
-    sfree(p4); sfree(p5);
-    sfree(p1); sfree(p1); sfree(p2);
-    p1 = smalloc(1000); p2 = smalloc(1000);
-    sfree(p2); sfree(p1);
+    sfree(p3); 
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 1000);
+    assert(_num_allocated_blocks() == 5);
+    assert(_num_allocated_bytes() == 5000);
+    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+    sfree(p5); 
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 2000);
+    assert(_num_allocated_blocks() == 5);
+    assert(_num_allocated_bytes() == 5000);
+    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+    sfree(p4); //Here it should be merged with 2 blocks
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 3096);
+    assert(_num_allocated_blocks() == 3);
+    assert(_num_allocated_bytes() == 5096);
+    assert(_num_meta_data_bytes() == 3 * META_SIZE);
+    p3 = smalloc(1000); 
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 2048);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5048);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+    p4 = smalloc(1000);
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 1000);
+    assert(_num_allocated_blocks() == 5);
+    assert(_num_allocated_bytes() == 5000);
+    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+    p5 = smalloc (1000);
+    assert(_num_free_blocks() == 0);
+    assert(_num_free_bytes() == 0);
+    assert(_num_allocated_blocks() == 5);
+    assert(_num_allocated_bytes() == 5000);
+    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+    sfree(p4);
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 1000);
+    assert(_num_allocated_blocks() == 5);
+    assert(_num_allocated_bytes() == 5000);
+    assert(_num_meta_data_bytes() == 5 * META_SIZE);
+    sfree(p5); //Merge with previous
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 2000 + META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000+META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+    sfree(p1);
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 3000 + META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000 + META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+    sfree(p1); //Nothing should happen
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 3000 + META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000 + META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE); 
+    sfree(p2); //Merge with prev
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 4000+2*META_SIZE);
+    assert(_num_allocated_blocks() == 3);
+    assert(_num_allocated_bytes() == 5000 + 2*META_SIZE);
+    assert(_num_meta_data_bytes() == 3 * META_SIZE);
+    p1 = smalloc(1000);
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 3000+META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000 + META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+    p2 = smalloc(1000);
+    assert(_num_free_blocks() == 1);
+    assert(_num_free_bytes() == 2000+META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000 + META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE);
+    sfree(p2);
+    assert(_num_free_blocks() == 2);
+    assert(_num_free_bytes() == 3000+META_SIZE);
+    assert(_num_allocated_blocks() == 4);
+    assert(_num_allocated_bytes() == 5000 + META_SIZE);
+    assert(_num_meta_data_bytes() == 4 * META_SIZE); 
+    sfree(p1); //Merge with next
     assert(_num_free_blocks() == 2);
     assert(_num_free_bytes() == 4000 + 2*META_SIZE);
     assert(_num_allocated_blocks() == 3);
@@ -1102,8 +1245,9 @@ int main() {
     assert(_num_allocated_blocks() == 6);
     assert(_num_allocated_bytes() == 7000);
     assert(_num_meta_data_bytes() == 6*META_SIZE);
-    assert(_get_tail((MallocMetadata*)heap_sbrk) == (MallocMetadata*)p6 - 1);
-    assert(_get_head((MallocMetadata*)heap_sbrk) == (MallocMetadata*)p1 - 1);
+    //assert(_get_tail((MallocMetadata*)heap_sbrk) == (MallocMetadata*)p6 - 1);
+    //assert(_get_head((MallocMetadata*)heap_sbrk) == (MallocMetadata*)p1 - 1);
+    /*
     p5 = smalloc(1000);
     p1 = srealloc(p1,500-sizeof(MallocMetadata));
     sfree(p1);
